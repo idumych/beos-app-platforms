@@ -52,6 +52,13 @@ VM=<vm> python3 scripts/mouse.py click X Y        # also: rclick, dclick, ctrlcl
 
 Coordinates are screenshot pixels. The script holds the button about 80 ms and moves in steps for drags, which suits Tracker drag-and-drop. Before quitting it calls `os._exit(0)`, because vboxapi's teardown prints a harmless traceback otherwise.
 
+- **Menu items need a hover first** (Haiku/Renku): an instant click on an item in a menu
+  that just opened is often ignored and the menu stays open. Move onto the item, wait, then
+  click: `m:move,X,Y w:0.4 m:click,X,Y`. Submenus the same way: hover the parent item, move
+  across into the submenu, hover the item, click.
+- **OCR picks the first matching word**, which may be in a status line rather than on the
+  button ("download" vs "Download"). Check the y coordinate, or read the screenshot.
+
 ## Files in and out
 
 1. **Best:** SSH (Haiku-family; see renku.md), then `scp` or `tar | ssh`.
