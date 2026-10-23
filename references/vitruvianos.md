@@ -12,8 +12,16 @@ There are two ways to get headers and libraries:
   - It needs `git cmake ninja g++ gcc bison m4 make pkg-config`. A shell *alias* for ninja doesn't count; the binary must exist.
   - Arch-family hosts report the compiler triple `x86_64-pc-linux-gnu`, which VitruvianOS's `engine.cmake` rejects. Pass `-DVOS_DYNAMIC_LINKER=/lib64/ld-linux-x86-64.so.2`.
   - These libraries only prove the link. The app uses the ones installed on V\OS at runtime.
+- **In CI (preferred for release packages; amd64 and arm64):** build natively, not cross. GitHub's free `ubuntu-24.04` and `ubuntu-24.04-arm` runners, each in a `debian:trixie` container (V\OS's userland, glibc ≤ 2.41), build the SDK with an arch-aware `make-sdk.sh` and then the `.deb`. ivpn-vitruvian (github.com/idumych/ivpn-vitruvian) is the template: `.github/workflows/build.yml` and `tools/vos-sdk/make-sdk.sh`.
+  - **apt build deps:** take the `-dev` list from VitruvianOS's own `.github/workflows/ccpp-arm64.yml` (at the release tag) and drop image tooling and the kits the link-only patch removes (pipewire, gstreamer, bluetooth, nm). With fewer packages, `rc` fails on a missing `FL_LIBRARY` (`libfl-dev`) and libbe on `zlib.h`, one error per run.
+  - **Per-arch settings:** `VOS_DYNAMIC_LINKER` = `/lib64/ld-linux-x86-64.so.2` or `/lib/ld-linux-aarch64.so.1`; `-DVITRUVIAN_TARGET_ARCH=amd64|arm64`; header dir `os/arch/x86_64|arm64`. With every dep from apt, Folio's ICU/flex/systemd bootstrapping isn't needed.
+  - Use `fail-fast: false` so one arch's failure doesn't cancel the other, and don't send cmake/ninja output to `/dev/null`: CI only shows "exit code 1".
+  - **Releases:** let the tag-triggered run create the release as a **prerelease** and attach the `.deb`s + `SHA256SUMS`. Test from those URLs in the VM, then `gh release edit <tag> --prerelease=false --latest`. VirtualBox can't run arm64 guests on an x86 host, so arm64 gets static checks only (ELF machine byte at offset 18 = `b7`, glibc), and the release notes say so.
 
 Resources: `rc` → `xres -o <bin>` → `resattr -O -o <bin>`. V\OS keeps the app signature both as resources and as attributes. The host-built `xres`/`resattr` need **absolute paths**.
+
+- **`rc` appends `.rsrc` to an output name that lacks it.** `rc x.rdef -o "$(mktemp)"` writes `/tmp/tmp.XXXX.rsrc`, so `xres`/`resattr` then read the empty mktemp file, apply nothing, and still exit 0. Use `mktemp --suffix=.rsrc`. A pile of `/tmp/tmp.*.rsrc` files is the giveaway.
+- `xres`/`resattr` on a binary that's **currently running** also fail without an error. Quit the app before re-running a postinst by hand.
 
 ## Package a .deb
 
@@ -54,8 +62,15 @@ The live session runs at 1280×800.
 cd /tmp && curl -fsSLO <release URL>/<pkg>_<v>-1_amd64.deb && sha256sum <pkg>_*.deb
 sudo apt install -y ./<pkg>_<v>-1_amd64.deb && dpkg -s <pkg> | grep Version
 getfattr -d -m user.beos /system/apps/<App>      # signature attributes restored?
+ls /tmp/*.rsrc                                   # should not exist (see the rc trap above)
 (<cmd> > /tmp/app.log 2>&1 &)
 ```
+
+If attributes are missing, reproduce through dpkg itself: `sudo dpkg --unpack x.deb`, add `set -x; exec 2>>/tmp/pi.log` to `/var/lib/dpkg/info/<pkg>.postinst` (and change its `>/dev/null` to the log), then `sudo dpkg --configure <pkg>`. Manual runs from a shell can pass for unrelated reasons (cwd, file names you happened to choose).
+
+Open every menu's items, About included: an item that sends `B_ABOUT_REQUESTED` from a window does nothing unless it's targeted at `be_app` (`item->SetTarget(be_app)`), because `AboutRequested()` lives on the application.
+
+**Apps that need an account** (VPN clients, sync tools): a logged-out test stops at the login screen. Never ask the user for credentials or type them into a VM. Test install, launch, signature and the screens reachable without logging in; list the rest under "Not tested" in the release notes, and offer that the user can log in themselves in the VM.
 
 Then the smoke test in SKILL.md (Ctrl+key = `k:1d,<code>,<code|80>,9d`), with these V\OS specifics:
 
