@@ -38,6 +38,22 @@ Folio's `packaging/build-deb.sh` is a template. The parts that matter:
   - The signature is still in the binary: `dpkg-deb --fsys-tarfile x.deb | tar -xO ./system/apps/<App> | strings -a | grep -c <signature>`.
   - Extract the attributes tarball **into a scratch dir**; extracting it next to the binary overwrites the binary with the empty placeholder.
 
+## Deskbar tray items
+
+A tray item (status icon) is a view that Deskbar loads from an add-on. On Linux, glibc won't `dlopen` a PIE executable, so either link the app as a "runnable add-on" (VitruvianOS's `RunnableAddOn` CMake macro: `-shared` plus a `.interp` section and `Scrt1.o`, the way NetworkStatus does it) or, simpler, ship a **separate add-on library**:
+
+- Build it from `-fPIC` objects: `g++ -shared -o Item.so *.o -Wl,--no-undefined -lbe -lroot`. `--no-undefined` turns a missing symbol into a build error instead of a Deskbar crash. Install it somewhere like `/system/add-ons/<pkg>/`.
+- Export `extern "C" _EXPORT BView* instantiate_deskbar_item(float maxWidth, float maxHeight)`.
+- **The view must be archivable.** Deskbar's `TReplicantTray::LoadAddOn()` calls your function, then archives the view and rebuilds it through `BShelf::AddReplicant()` → `instantiate_object()`. Give the view a `BView(BMessage*)` constructor, a `static BArchivable* Instantiate(BMessage*)` (with `validate_instantiation`), and `Archive()`. Without them nothing appears, and the journal shows `Deskbar[pid]: instantiate_object failed: No signature specified in archive, looking for class "…"`.
+- **Use a unique class name** (`MyAppDeskbarView`): every tray add-on lives in the Deskbar process, and `instantiate_object` looks classes up by name.
+- `LoadAddOn()` **ignores** `AddIcon()`'s failure, so `BDeskbar::AddItem(&ref)` returns `B_OK` even when nothing appeared. Check the tray, and `journalctl -b | grep -i deskbar`.
+- **A failed add-on stays loaded** in Deskbar, and glibc hands back the cached image for the same path, so a fixed build isn't picked up until Deskbar restarts: `quit application/x-vnd.Be-TSKB`, then, because the session manager doesn't relaunch it, `setsid /system/Deskbar >/dev/null 2>&1 &`. Each failed attempt also adds the path to `~/config/settings/deskbar/replicants`; duplicates are skipped later.
+- There is no `desklink` on VitruvianOS; add the item from the app (`BDeskbar().AddItem(&ref)`, `HasItem(name)`, `RemoveItem(name)`).
+- Give the item its own connection to whatever it monitors, so it works while the app is closed. Ask the app to act through `be_roster->Launch(signature, &message)`: it reaches a running app, or starts it with that message, which may arrive before `ReadyToRun()`, so queue it.
+- Draw with `AdoptParentColors()` in `AttachedToWindow()`, and use `SetToolTip()` for the status text.
+
+ivpn-vitruvian's `src/deskbar/` is a worked example.
+
 ## Make a test VM
 
 The images are raw **UEFI** disks (e.g. `vitruvian-0.6.2-amd64.raw`):

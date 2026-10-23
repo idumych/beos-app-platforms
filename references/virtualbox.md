@@ -58,6 +58,26 @@ Coordinates are screenshot pixels. The script holds the button about 80 ms and m
 2. **Published files:** `curl` the GitHub release URL from inside the guest. This is also the truest install test.
 3. **From the host:** run `python3 -m http.server PORT --bind <LAN-IP>` in a directory holding only what's needed, and stop it afterwards. Find the LAN IP with `ip route get 1.1.1.1 | grep -oP 'src \K\S+'`. **127.0.0.1 doesn't work:** VirtualBox 7 NAT blocks guest-to-host loopback (`10.0.2.2` gives connection refused). The host's ufw allows this, because NAT traffic comes from the host itself.
 4. **Tiny files without networking:** `echo <base64> | base64 -d | tar -xz` typed with `t:`.
+5. **Unreleased test builds when 3 is blocked** (auto mode may refuse a LAN server, or an ISO attached as a DVD, as "exposing local services"): tag a release candidate (`v1.2.3-rc1`) so the tag-triggered CI publishes it as a **prerelease**, which never becomes "Latest". Install it from the release URL like a real release, and delete the rc releases and tags once the final is out. `gh release delete <tag> --cleanup-tag` removes the local tag too, so don't `git tag -d` after it in an `&&` chain.
+
+## Driving the user's own VM
+
+When the user asks you to test in a VM they're using:
+
+- **Their host mouse moves the guest pointer** whenever it passes over the VM window in the VirtualBox GUI, and **resizing that window changes the guest resolution**. Clicks then land in the wrong place (a click can become a drag). Re-check the resolution (`PIL.Image.open(shot).size`) and take a screenshot before every click; ask the user to keep the mouse off the window while you work.
+- **Windows stack.** A window hidden under another can't be clicked; raise it from its Deskbar entry first (click the app, then the window name in the list that opens).
+- **Escape may not close a pop-up menu** in a VitruvianOS app; click an empty spot on the desktop instead, then screenshot before the next step.
+- **Passwords:** run the command and stop at the `[sudo] password` prompt; the user types it. `sudo` stays cached for about 15 minutes.
+- **Put back what you changed** (settings, connections) and say so.
+
+## Screenshots that must not show private data
+
+`VBoxManage controlvm … screenshotpng` writes the full screen to disk. For apps that show an account ID, e-mail address or key, use `scripts/redactshot.py` instead: it grabs the screen into memory and saves only a redacted copy.
+
+1. Read the app's source to find where the private text is drawn (a label at the bottom of the window, an item in a menu).
+2. Before the window's position is known, use `--panel-bottom PX`: it blacks out the bottom PX pixels of each window panel, and blacks out the whole image when it finds none.
+3. Once a redacted shot shows where the window sits, add `--fixed X0,Y0,X1,Y1` rectangles: over that area, and over a menu's private item before opening the menu. Be generous; a few lost pixels don't matter.
+4. Keep only the shots you need; delete the rest.
 
 ## Hygiene
 

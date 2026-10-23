@@ -28,6 +28,7 @@ Helper scripts in `scripts/` (read each script's header first):
 - `mouse.py`: absolute mouse input through `vboxapi` (needs the `virtualbox-sdk` package)
 - `xtest.sh STEP…`: drive a Cosmoe app under Xvfb (`APP=`, `APP_NAME=`; `start`, held clicks, keys, screenshots)
 - `serve-ssh-setup.sh`: one-time key-only SSH setup for a Haiku-family guest
+- `redactshot.py`: screenshot with private areas (account IDs, keys) blacked out before anything is written to disk
 
 ## Rules that matter
 
@@ -35,6 +36,7 @@ Helper scripts in `scripts/` (read each script's header first):
 - **Build release packages in CI, not against the user's local libraries,** unless the user says otherwise (V\OS `.deb`s: vitruvianos.md; AppImages: cosmoe-linux.md).
 - **Test the exact artifact you publish.** Build every package from one commit. Download the CI AppImage rather than testing a local build. Inside the VMs, install from the release URLs, and compare checksums.
 - **Don't build release AppImages on an Arch/CachyOS host.** CachyOS packages are built for x86-64-v3 (AVX2), and rolling-release glibc is newer than most distros'. An AppImage built there crashes on older CPUs and won't start on Ubuntu 24.04. Build releases in CI on the oldest supported distro.
+- **Never capture or type the user's secrets.** Don't type passwords or account IDs into a VM: run the command and let the user answer the `sudo`/login prompt. If an app shows an account ID or similar, take every screenshot with `redactshot.py` and keep the private part out of the shot (see virtualbox.md).
 - **Report results honestly.** "Type-checked" isn't "ran", and a headless X11 run isn't a Wayland run. Keep the README's platform table and the release notes' "Tested" section in step with what was actually exercised.
 - **Keep platform code contained.** Put the logic you can test anywhere in a portable core with no Haiku headers. Put platform differences in the Makefile's platform branches and behind a define such as `-DAPP_COSMOE`, never scattered through the code.
 
