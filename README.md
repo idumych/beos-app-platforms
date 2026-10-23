@@ -5,7 +5,7 @@ A [Claude Code](https://claude.com/claude-code) skill for building, packaging, t
 | Platform | Package | Tested in |
 |---|---|---|
 | [Renku OS](https://github.com/RenkuOS/Source) (Haiku fork) | `.hpkg` | VirtualBox VM |
-| [VitruvianOS](https://v-os.dev) (Haiku API on Linux) | `.deb` | VirtualBox VM |
+| [VitruvianOS](https://v-os.dev) (Haiku API on Linux) | `.deb` (amd64, arm64) | VirtualBox VM (amd64); static checks (arm64) |
 | Linux, through [Cosmoe](https://github.com/haydentech/cosmoe) | AppImage | Xvfb + Openbox, headless |
 
 It records what was learned shipping [Folio](https://github.com/idumych/folio) on all three:

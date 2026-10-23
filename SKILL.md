@@ -10,7 +10,7 @@ A BeOS-style app is C++ written against the Be/Haiku API (BApplication, BWindow,
 | Platform | What it is | Package | Built where | Tested how |
 |---|---|---|---|---|
 | **Renku OS** | Fork of Haiku; still names its system package `haiku`, version `r1~beta6` | `.hpkg` (`package create`) | Inside a Haiku-family VM, over SSH | VirtualBox VM: keyboard, mouse, screenshots |
-| **VitruvianOS** (V\OS) | Haiku API on a Linux kernel, Debian userland | `.deb` installing to `/system/apps` | On the Linux host, with a link-time SDK | VirtualBox VM (UEFI) |
+| **VitruvianOS** (V\OS) | Haiku API on a Linux kernel, Debian userland | `.deb` installing to `/system/apps`, **amd64 and arm64** | In CI, natively per architecture, with a link-time SDK | VirtualBox VM (UEFI; amd64 only) |
 | **Linux** | Any desktop, through the Cosmoe library | AppImage | **CI** (Ubuntu 24.04) for releases; locally only for porting | Xvfb + Openbox, driven with xdotool |
 
 Read the reference file for what you're doing:
@@ -34,6 +34,8 @@ Helper scripts in `scripts/` (read each script's header first):
 
 - **Never contact the Haiku project** (no Trac tickets, patches or forum posts), even for bugs that Renku or Cosmoe inherited from Haiku: the user says Haiku doesn't welcome AI contributions. Upstream reports go to **RenkuOS/Source** (AI-assisted work is explicitly allowed; keep write-ups short and plain) and **haydentech/cosmoe**. File only after reproducing the bug in the platform's own code or bundled apps, not just in your app.
 - **Build release packages in CI, not against the user's local libraries,** unless the user says otherwise (V\OS `.deb`s: vitruvianos.md; AppImages: cosmoe-linux.md).
+- **Target amd64 and arm64 for VitruvianOS** by default: one `deb.yml` job per architecture on `ubuntu-24.04` / `ubuntu-24.04-arm` in `debian:trixie` (haiku-onboard's templates do this). arm64 gets static checks, since VirtualBox can't run arm64 guests on x86.
+- **Linux means X11 and Wayland:** Cosmoe picks its backend from `WAYLAND_DISPLAY` / `COSMOE_BACKEND`; the AppImage bundles both, and `appimage.yml` smoke-tests it on a headless Weston (cosmoe-linux.md).
 - **Test the exact artifact you publish.** Build every package from one commit. Download the CI AppImage rather than testing a local build. Inside the VMs, install from the release URLs, and compare checksums.
 - **Don't build release AppImages on an Arch/CachyOS host.** CachyOS packages are built for x86-64-v3 (AVX2), and rolling-release glibc is newer than most distros'. An AppImage built there crashes on older CPUs and won't start on Ubuntu 24.04. Build releases in CI on the oldest supported distro.
 - **Never capture or type the user's secrets.** Don't type passwords or account IDs into a VM: run the command and let the user answer the `sudo`/login prompt. If an app shows an account ID or similar, take every screenshot with `redactshot.py` and keep the private part out of the shot (see virtualbox.md).

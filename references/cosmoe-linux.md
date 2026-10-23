@@ -19,6 +19,8 @@ Cosmoe (github.com/haydentech/cosmoe, MIT licence) is the Haiku API as a C++ lib
 | `be_roster->Launch(&ref)` for folders, files, URLs | Not the Linux desktop | `posix_spawnp("xdg-open", …)` and `waitpid` |
 | Zero-length clicks | Stop all input to the window for good (cosmoe#5) | Nothing to fix in the app; hold clicks for 150 ms in tests |
 | Image translators on a first run from a mounted AppImage | None load, so `GetBitmapFile()` returns NULL all session (cosmoe#4) | Have AppRun set `TRANSLATORS=<bundle>/usr/lib/addons/Translators` (a single path: `AddPaths()` drops a character from all but the last entry) |
+| Font faces: `SetFamilyAndFace(family, B_REGULAR_FACE / B_ITALIC_FACE)` | Maps onto installed styles unreliably: Regular can come out as Thin, italic as upright | Ask for styles by name first: `SetFamilyAndStyle(family, "Regular" / "Bold" / "Italic" / "Bold Italic")`, fall back to the face |
+| `SetToolTip()` | The tooltip never hides; it stays drawn above every window | Skip tooltips under `#ifdef APP_COSMOE` (or show the hint as a label) |
 | `find_directory` | Settings → `~/.config/cosmoe`; Trash → `~/.local/share/Trash/files`; `B_USER_DIRECTORY` → `$HOME`. Cosmoe also creates `~/cosmoe/` | Write `.trashinfo` records (the XDG layout matches V\OS's) |
 | Attributes | `user.*` xattrs (plus `user.COSMOE:ATTR_TYPES`); no queries | — |
 
@@ -103,4 +105,4 @@ APP=/path/App-x86_64.AppImage APP_NAME=App sh scripts/xtest.sh start shot:b    #
 - **Timing:** `LD_DEBUG` and gdb slow startup and can hide timing problems, so confirm without them.
 - **First run:** test both a **fresh HOME** and a reused one, and both the **mounted** and the extracted AppImage. cosmoe#4 only shows on a fresh HOME with the mounted image.
 
-Not testable headlessly yet: the Wayland backend, and drag-and-drop from a Linux file manager (XDND). Use a desktop Linux VM (see virtualbox.md) or ask the user to try on their own session.
+Wayland is testable headlessly with **sway** on wlroots' headless backend (`WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_LIBINPUT_NO_DEVICES=1 sway -c <conf>`) and `grim` for screenshots: haiku-onboard's `packaging/appimage/wayland-smoke.sh`, run by `appimage.yml`. Headless **Weston** doesn't work: it offers no `wl_seat`, and a Cosmoe app opens its window and then exits with status 127. Still not testable headlessly: drag-and-drop from a Linux file manager (XDND). Use a desktop Linux VM (see virtualbox.md) or ask the user to try on their own session.

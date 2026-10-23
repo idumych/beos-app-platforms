@@ -12,7 +12,7 @@ There are two ways to get headers and libraries:
   - It needs `git cmake ninja g++ gcc bison m4 make pkg-config`. A shell *alias* for ninja doesn't count; the binary must exist.
   - Arch-family hosts report the compiler triple `x86_64-pc-linux-gnu`, which VitruvianOS's `engine.cmake` rejects. Pass `-DVOS_DYNAMIC_LINKER=/lib64/ld-linux-x86-64.so.2`.
   - These libraries only prove the link. The app uses the ones installed on V\OS at runtime.
-- **In CI (preferred for release packages; amd64 and arm64):** build natively, not cross. GitHub's free `ubuntu-24.04` and `ubuntu-24.04-arm` runners, each in a `debian:trixie` container (V\OS's userland, glibc ≤ 2.41), build the SDK with an arch-aware `make-sdk.sh` and then the `.deb`. ivpn-vitruvian (github.com/idumych/ivpn-vitruvian) is the template: `.github/workflows/build.yml` and `tools/vos-sdk/make-sdk.sh`.
+- **In CI (the default for release packages; amd64 and arm64):** build natively, not cross. GitHub's free `ubuntu-24.04` and `ubuntu-24.04-arm` runners, each in a `debian:trixie` container (V\OS's userland, glibc ≤ 2.41), build the SDK with an arch-aware `make-sdk.sh` and then the `.deb`. ivpn-vitruvian (github.com/idumych/ivpn-vitruvian) is the template: `.github/workflows/build.yml` and `tools/vos-sdk/make-sdk.sh`.
   - **apt build deps:** take the `-dev` list from VitruvianOS's own `.github/workflows/ccpp-arm64.yml` (at the release tag) and drop image tooling and the kits the link-only patch removes (pipewire, gstreamer, bluetooth, nm). With fewer packages, `rc` fails on a missing `FL_LIBRARY` (`libfl-dev`) and libbe on `zlib.h`, one error per run.
   - **Per-arch settings:** `VOS_DYNAMIC_LINKER` = `/lib64/ld-linux-x86-64.so.2` or `/lib/ld-linux-aarch64.so.1`; `-DVITRUVIAN_TARGET_ARCH=amd64|arm64`; header dir `os/arch/x86_64|arm64`. With every dep from apt, Folio's ICU/flex/systemd bootstrapping isn't needed.
   - Use `fail-fast: false` so one arch's failure doesn't cancel the other, and don't send cmake/ninja output to `/dev/null`: CI only shows "exit code 1".
@@ -75,8 +75,8 @@ The live session runs at 1280×800.
 ## Test checklist
 
 ```sh
-cd /tmp && curl -fsSLO <release URL>/<pkg>_<v>-1_amd64.deb && sha256sum <pkg>_*.deb
-sudo apt install -y ./<pkg>_<v>-1_amd64.deb && dpkg -s <pkg> | grep Version
+cd /tmp && curl -fsSLO <release URL>/<pkg>_<v>-1_<arch>.deb && sha256sum <pkg>_*.deb   # <arch>: amd64 or arm64
+sudo apt install -y ./<pkg>_<v>-1_<arch>.deb && dpkg -s <pkg> | grep Version
 getfattr -d -m user.beos /system/apps/<App>      # signature attributes restored?
 ls /tmp/*.rsrc                                   # should not exist (see the rc trap above)
 (<cmd> > /tmp/app.log 2>&1 &)

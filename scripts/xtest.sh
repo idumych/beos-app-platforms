@@ -5,6 +5,7 @@
 #   Xvfb :99 -screen 0 1280x800x24 -nolisten tcp &
 #   DISPLAY=:99 openbox &
 #
+#   XDISPLAY=:N        X display to use (default :99; pick another if one is in use)
 #   APP=<cmd>          what to launch (a binary or an AppImage; required)
 #   APP_NAME=<name>    its process name, for pkill (default: basename of APP)
 #   LIBDIR=<dir>       LD_LIBRARY_PATH for a local build (unset for AppImages)
@@ -29,11 +30,14 @@ SCRATCH=${SCRATCH:-/tmp/beos-xtest}
 HOME_DIR=${HOME_DIR:-$SCRATCH/home}
 APP=${APP:?set APP=<binary or AppImage>}
 APP_NAME=${APP_NAME:-$(basename "$APP" | sed "s/-.*AppImage$//; s/\.AppImage$//")}
-export DISPLAY=:99
+export DISPLAY=${XDISPLAY:-:99}
 mkdir -p "$SCRATCH/fakebin" "$HOME_DIR"
 
 press() {	# press X Y BUTTON
-	xdotool mousemove "$1" "$2" mousedown "$3"
+	# Hover first: a menu item clicked the instant the pointer lands on it is ignored.
+	xdotool mousemove "$1" "$2"
+	sleep 0.3
+	xdotool mousedown "$3"
 	sleep 0.15
 	xdotool mouseup "$3"
 }
