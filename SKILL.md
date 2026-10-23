@@ -56,11 +56,11 @@ Keep `CXXFLAGS` additive (`override CXXFLAGS +=`) so packagers can pass hardenin
 ## The release workflow
 
 1. **Bump the version** everywhere it's written: the `.rdef` `app_version`, each packaging script, the Debian changelog, and file names in the README. Then `git grep` for the old version.
-2. **Run checks on the host:** unit tests; a type-check against real Haiku headers; a VitruvianOS SDK link.
-3. **Commit, push, and start the AppImage CI** (`gh workflow run <file>.yml --ref main`). Wait for it with `gh run watch <id> --exit-status` in the background.
-4. **Build the `.deb` and `.hpkg`** from the same commit: `git archive HEAD | ssh <guest> '… make hpkg'`.
-5. **Test every artifact** on its platform, using the checklists in the reference files.
-6. **Publish:** `sha256sum … > SHA256SUMS`; create an annotated tag and push it; `gh release create … --verify-tag`. Make the tag-triggered CI leave an AppImage that's already attached alone, so `SHA256SUMS` stays true.
+2. **Run checks on the host:** unit tests; a type-check against real Haiku headers (current headers: R1/beta6 lacks some, such as `AboutWindow.h`, so CI is the real check).
+3. **Commit, push, and build everything in CI** from that commit: the `.hpkg` (Haiku R1/beta6 VM on a runner), the `.deb` for amd64 and arm64 (`gh workflow run deb.yml --ref main`) and the AppImage, whose job also runs the Wayland smoke test (`gh workflow run appimage.yml --ref main`). Wait with `gh run watch <id> --exit-status` in the background.
+4. **README screenshots** from that release candidate: one per platform, cropped to the window, in `docs/screenshots/`, shown in README.md with captions. Commit them **before** the final build, since the release must be built and tested from one commit; then rebuild.
+5. **Test every artifact** on its platform, using the checklists in the reference files: the amd64 `.deb` in the VM, the arm64 `.deb` statically (no arm64 VirtualBox guests on x86), the AppImage under Xvfb and its Wayland smoke screenshot.
+6. **Publish:** `sha256sum … > SHA256SUMS` (hpkg, both `.deb`s, AppImage); create an annotated tag and push it; `gh release create … --verify-tag`. Make the tag-triggered CI leave artifacts that are already attached alone, so `SHA256SUMS` stays true.
 7. **Re-test from the release:** `curl` the release URLs inside each VM.
 
 ## Platform cheat sheet
