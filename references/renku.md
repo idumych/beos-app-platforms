@@ -41,6 +41,38 @@ What makes Haiku's sshd different (the script handles all of it):
 - launch_daemon starts sshd at boot, so no startup script is needed. A sshd that's already running keeps its old config: kill it and run `/bin/sshd` (absolute path required).
 - `ps` prints `name [args] team threads gid uid`, so the team ID is field `NF-3`.
 
+## Build an hpkg in GitHub CI (no VM of your own)
+
+`cross-platform-actions/action` runs a Haiku R1/beta6 VM on a GitHub runner; a build plus
+tests and `package create` took about a minute (Sheath, `.github/workflows/haiku.yml`):
+
+```yaml
+- uses: cross-platform-actions/action@v1.6.0
+  with:
+    operating_system: haiku
+    version: r1beta6
+    architecture: x86-64
+    memory: 4G
+    cpu_count: 4
+    shell: bash
+    run: |
+      pkgman install -y gcc make haiku_devel pkgconfig <your>_devel
+      sh packaging/build-hpkg.sh
+- uses: actions/upload-artifact@v4
+  with: { name: app-hpkg, path: '*.hpkg' }
+```
+
+The job runs as `user` in a copy of the checkout. Packages from HaikuPorts install with
+`pkgman install -y` (e.g. `sword_devel`, which also brings `diatheke`). The same .hpkg
+installed and ran on Renku nightly build00055.
+
+**Header differences:** `tools/haiku-typecheck.sh` checks against Haiku's *current* headers,
+so it misses things beta6 doesn't have: `AboutWindow.h` (BAboutWindow) is not in beta6's
+public headers — use a BAlert. CI on beta6 is the real check.
+
+**pkgman on Renku** may say "A reboot is necessary to complete the installation process"
+when a dependency updates system packages (e.g. ICU); `shutdown -r` and reconnect.
+
 ## Build an hpkg
 
 Inside the guest, `pkgman install gcc make haiku_devel` (only what's missing). Then from the host:
