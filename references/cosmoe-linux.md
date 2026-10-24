@@ -1,13 +1,20 @@
-# Linux via Cosmoe (AppImage)
+# Linux via Kireji/Cosmoe (AppImage)
 
-Cosmoe (github.com/haydentech/cosmoe, MIT licence) is the Haiku API as a C++ library on X11, Wayland, macOS and Windows:
+**Use Kireji** (github.com/idumych/kireji, branch `kireji`), the user's fork of Cosmoe (github.com/haydentech/cosmoe, MIT licence). Cosmoe is the Haiku API as a C++ library on X11, Wayland, macOS and Windows; Kireji follows it and adds fixes for freestanding Haiku/Renku app ports. Upstream doesn't accept AI contributions, so:
+
+- **Fix Cosmoe bugs in Kireji, not with workarounds in the app.** Commit the fix to the `kireji` branch (a new commit; don't rewrite it), list it under "Changes from Cosmoe" in Kireji's README, and rebuild the app. Never open issues or pull requests upstream.
+- The haiku-onboard templates build against Kireji by default (`COSMOE_REPO`/`COSMOE_TAG` in `haiku-app.env` override it). CI caches the build by the commit the branch points at, so a new Kireji commit rebuilds it (about 15 minutes).
+
+What it is like:
 
 - **No servers.** Wayland and X11 backends are plugins (`libcosmoe-x11.so`, `libcosmoe-wayland.so`), chosen at runtime. Override with `COSMOE_BACKEND=x11|wayland`.
 - **Relocatable.** It finds its add-ons (`<libdir>/addons`) and data relative to wherever `libbe.so` is loaded (`dladdr`), which is what makes an AppImage possible.
 - **Merged kits.** The translation kit, network kit and others are folded into `libbe`, so link `-lbe -ltracker`.
-- **Pin a release tag** (e.g. `v0.9.0_20261013`) and build from source. Cosmoe's prebuilt `.deb`s target Ubuntu 26.04 only.
+- **Build from source** (Kireji's `kireji` branch). Cosmoe's prebuilt `.deb`s target Ubuntu 26.04 only.
 
 ## Porting traps (check these first)
+
+Rows marked **Fixed in Kireji** need nothing in the app. The others are still open: fix them in Kireji when an app needs it, or work around them.
 
 | Haiku behaviour your code may rely on | On Cosmoe | Do this |
 |---|---|---|
@@ -19,12 +26,12 @@ Cosmoe (github.com/haydentech/cosmoe, MIT licence) is the Haiku API as a C++ lib
 | `be_roster->Launch(&ref)` for folders, files, URLs | Not the Linux desktop | `posix_spawnp("xdg-open", …)` and `waitpid` |
 | Zero-length clicks | Stop all input to the window for good (cosmoe#5) | Nothing to fix in the app; hold clicks for 150 ms in tests |
 | Image translators on a first run from a mounted AppImage | None load, so `GetBitmapFile()` returns NULL all session (cosmoe#4) | Have AppRun set `TRANSLATORS=<bundle>/usr/lib/addons/Translators` (a single path: `AddPaths()` drops a character from all but the last entry) |
-| Font faces: `SetFamilyAndFace(family, B_REGULAR_FACE / B_ITALIC_FACE)` | Maps onto installed styles unreliably: Regular can come out as Thin, italic as upright | Ask for styles by name first: `SetFamilyAndStyle(family, "Regular" / "Bold" / "Italic" / "Bold Italic")`, fall back to the face |
-| `SetToolTip()` | The tooltip never hides; it stays drawn above every window | Skip tooltips under `#ifdef APP_COSMOE` (or show the hint as a label) |
+| Font faces: `SetFamilyAndFace(family, B_REGULAR_FACE / B_ITALIC_FACE)` | Upstream: every weight below Bold counted as regular, so Regular could come out Thin | **Fixed in Kireji** (Haiku's light/heavy/condensed faces; canonical style names win ties) |
+| `SetEventMask(B_POINTER_EVENTS)`, tooltips | Upstream: views in other windows never got pointer events, so tooltips never hid | **Fixed in Kireji** (pointer events delivered app-wide, as on Haiku) |
 | `find_directory` | Settings → `~/.config/cosmoe`; Trash → `~/.local/share/Trash/files`; `B_USER_DIRECTORY` → `$HOME`. Cosmoe also creates `~/cosmoe/` | Write `.trashinfo` records (the XDG layout matches V\OS's) |
 | Attributes | `user.*` xattrs (plus `user.COSMOE:ATTR_TYPES`); no queries | — |
 
-Check the open issues on haydentech/cosmoe before relying on a workaround, and drop it once the pinned tag includes a fix.
+When a trap is fixed in Kireji, remove the app's workaround and mark the row here.
 
 ## Makefile branch
 
@@ -52,10 +59,10 @@ obj/App.rsrc.o: App.rdef
 
 Cosmoe's own `data/develop/makefile-engine` is the reference for flags. It also links cairo/pango, which a typical app doesn't need. The include root itself must be on the path (`<config/HaikuConfig.h>`, `<private/app/…>`).
 
-## Build Cosmoe locally (porting and debugging)
+## Build Kireji locally (porting and debugging)
 
 ```sh
-git clone --depth 1 --branch <tag> https://github.com/haydentech/cosmoe.git cosmoe-src
+git clone --depth 1 --branch kireji https://github.com/idumych/kireji.git cosmoe-src
 cd cosmoe-src && meson setup builddir --prefix=/usr --libdir=lib -Denable_unit_test_compile=false
 ninja -C builddir && DESTDIR=<stage> meson install -C builddir --no-rebuild
 make COSMOE_ROOT=<stage>/usr && LD_LIBRARY_PATH=<stage>/usr/lib ./App
