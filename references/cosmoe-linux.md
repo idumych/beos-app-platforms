@@ -1,37 +1,37 @@
-# Linux via Kireji/Cosmoe (AppImage)
+# Linux via Hokku/Cosmoe (AppImage)
 
-**Use Kireji** (github.com/idumych/kireji, branch `kireji`), the user's fork of Cosmoe (github.com/haydentech/cosmoe, MIT licence). Cosmoe is the Haiku API as a C++ library on X11, Wayland, macOS and Windows; Kireji follows it and adds fixes for freestanding Haiku/Renku app ports. Upstream doesn't accept AI contributions, so:
+**Use Hokku** (github.com/idumych/hokku, branch `hokku`), the user's fork of Cosmoe (github.com/haydentech/cosmoe, MIT licence). Cosmoe is the Haiku API as a C++ library on X11, Wayland, macOS and Windows; Hokku follows it and adds fixes for freestanding Haiku/Renku app ports. Upstream doesn't accept AI contributions, so:
 
-- **Fix Cosmoe bugs in Kireji, not with workarounds in the app.** Commit the fix to the `kireji` branch (a new commit; don't rewrite it), list it under "Changes from Cosmoe" in Kireji's README, and rebuild the app. Never open issues or pull requests upstream.
-- The haiku-onboard templates build against Kireji by default (`COSMOE_REPO`/`COSMOE_TAG` in `haiku-app.env` override it). CI caches the build by the commit the branch points at, so a new Kireji commit rebuilds it (about 15 minutes).
+- **Fix Cosmoe bugs in Hokku, not with workarounds in the app.** Commit the fix to the `hokku` branch (a new commit; don't rewrite it), list it under "Changes from Cosmoe" in Hokku's README, and rebuild the app. Never open issues or pull requests upstream.
+- The haiku-onboard templates build against Hokku by default (`COSMOE_REPO`/`COSMOE_TAG` in `haiku-app.env` override it). CI caches the build by the commit the branch points at, so a new Hokku commit rebuilds it (about 15 minutes).
 
 What it is like:
 
 - **No servers.** Wayland and X11 backends are plugins (`libcosmoe-x11.so`, `libcosmoe-wayland.so`), chosen at runtime. Override with `COSMOE_BACKEND=x11|wayland`.
 - **Relocatable.** It finds its add-ons (`<libdir>/addons`) and data relative to wherever `libbe.so` is loaded (`dladdr`), which is what makes an AppImage possible.
 - **Merged kits.** The translation kit, network kit and others are folded into `libbe`, so link `-lbe -ltracker`.
-- **Build from source** (Kireji's `kireji` branch). Cosmoe's prebuilt `.deb`s target Ubuntu 26.04 only.
+- **Build from source** (Hokku's `hokku` branch). Cosmoe's prebuilt `.deb`s target Ubuntu 26.04 only.
 
 ## Porting traps (check these first)
 
-Rows marked **Fixed in Kireji** need nothing in the app. The others are still open: fix them in Kireji when an app needs it, or work around them.
+Rows marked **Fixed in Hokku** need nothing in the app. The others are still open: fix them in Hokku when an app needs it, or work around them.
 
 | Haiku behaviour your code may rely on | On Cosmoe | Do this |
 |---|---|---|
-| `watch_node(&node_ref, …)` | Upstream: stub, returns `B_NOT_SUPPORTED`; silently no messages | **Fixed in Kireji** (it finds a path for the node from an existing watch or an open `BNode`/`BEntry`). Either way, re-watch folders that move to another directory |
-| Node-monitor `device`/`node` are int32/int64 | Upstream: `B_DEVICE_TYPE`/`B_INODE_TYPE` fields | **Fixed in Kireji** (int32/int64, and `FindInt32()`/`FindDevice()` etc. accept either) |
+| `watch_node(&node_ref, …)` | Upstream: stub, returns `B_NOT_SUPPORTED`; silently no messages | **Fixed in Hokku** (it finds a path for the node from an existing watch or an open `BNode`/`BEntry`). Either way, re-watch folders that move to another directory |
+| Node-monitor `device`/`node` are int32/int64 | Upstream: `B_DEVICE_TYPE`/`B_INODE_TYPE` fields | **Fixed in Hokku** (int32/int64, and `FindInt32()`/`FindDevice()` etc. accept either) |
 | Node-monitor `name` is a leaf | It's the **full path** | If `name` starts with `/`, use it directly |
-| `entry_ref::name` is a leaf | **Full path** (by design: Linux can't find a directory from its node) | Use `BPath(&ref).Leaf()` or `BEntry::GetName()`. Kireji's file panels, Save panel and Open With already show the leaf |
-| `B_UNDERSCORE_FACE`, `B_STRIKEOUT_FACE` | Upstream: not drawn, and they select a different (e.g. Light) style | **Fixed in Kireji** (drawn, at the right weight) |
+| `entry_ref::name` is a leaf | **Full path** (by design: Linux can't find a directory from its node) | Use `BPath(&ref).Leaf()` or `BEntry::GetName()`. Hokku's file panels, Save panel and Open With already show the leaf |
+| `B_UNDERSCORE_FACE`, `B_STRIKEOUT_FACE` | Upstream: not drawn, and they select a different (e.g. Light) style | **Fixed in Hokku** (drawn, at the right weight) |
 | `be_roster->Launch(&ref)` for folders, files, URLs | Not the Linux desktop | `posix_spawnp("xdg-open", …)` and `waitpid` |
-| Zero-length clicks | Upstream: freeze the window for good (a `BMessageRunner` deadlock hit by `BTextView`) | **Fixed in Kireji**. `xtest.sh` still holds clicks for 150 ms |
-| Image translators on a first run from a mounted AppImage | With Cosmoe v0.9.0 none loaded, so `GetBitmapFile()` returned NULL all session. Not reproduced since, with Kireji or v0.9.0 | Keep AppRun setting `TRANSLATORS=<bundle>/usr/lib/addons/Translators`. Kireji fixed its colon-splitting off-by-one and prints the directories searched when none load |
-| Font faces: `SetFamilyAndFace(family, B_REGULAR_FACE / B_ITALIC_FACE)` | Upstream: every weight below Bold counted as regular, so Regular could come out Thin | **Fixed in Kireji** (Haiku's light/heavy/condensed faces; canonical style names win ties) |
-| `SetEventMask(B_POINTER_EVENTS)`, tooltips | Upstream: views in other windows never got pointer events, so tooltips never hid | **Fixed in Kireji** (pointer events delivered app-wide, as on Haiku) |
+| Zero-length clicks | Upstream: freeze the window for good (a `BMessageRunner` deadlock hit by `BTextView`) | **Fixed in Hokku**. `xtest.sh` still holds clicks for 150 ms |
+| Image translators on a first run from a mounted AppImage | With Cosmoe v0.9.0 none loaded, so `GetBitmapFile()` returned NULL all session. Not reproduced since, with Hokku or v0.9.0 | Keep AppRun setting `TRANSLATORS=<bundle>/usr/lib/addons/Translators`. Hokku fixed its colon-splitting off-by-one and prints the directories searched when none load |
+| Font faces: `SetFamilyAndFace(family, B_REGULAR_FACE / B_ITALIC_FACE)` | Upstream: every weight below Bold counted as regular, so Regular could come out Thin | **Fixed in Hokku** (Haiku's light/heavy/condensed faces; canonical style names win ties) |
+| `SetEventMask(B_POINTER_EVENTS)`, tooltips | Upstream: views in other windows never got pointer events, so tooltips never hid | **Fixed in Hokku** (pointer events delivered app-wide, as on Haiku) |
 | `find_directory` | Settings → `~/.config/cosmoe`; Trash → `~/.local/share/Trash/files`; `B_USER_DIRECTORY` → `$HOME`. Cosmoe also creates `~/cosmoe/` | Write `.trashinfo` records (the XDG layout matches V\OS's) |
 | Attributes | `user.*` xattrs (plus `user.COSMOE:ATTR_TYPES`); no queries | — |
 
-When a trap is fixed in Kireji, remove the app's workaround and mark the row here.
+When a trap is fixed in Hokku, remove the app's workaround and mark the row here.
 
 ## Makefile branch
 
@@ -59,16 +59,16 @@ obj/App.rsrc.o: App.rdef
 
 Cosmoe's own `data/develop/makefile-engine` is the reference for flags. It also links cairo/pango, which a typical app doesn't need. The include root itself must be on the path (`<config/HaikuConfig.h>`, `<private/app/…>`).
 
-## Build Kireji locally (porting and debugging)
+## Build Hokku locally (porting and debugging)
 
 ```sh
-git clone --depth 1 --branch kireji https://github.com/idumych/kireji.git cosmoe-src
+git clone --depth 1 --branch hokku https://github.com/idumych/hokku.git cosmoe-src
 cd cosmoe-src && meson setup builddir --prefix=/usr --libdir=lib -Denable_unit_test_compile=false
 ninja -C builddir && DESTDIR=<stage> meson install -C builddir --no-rebuild
 make COSMOE_ROOT=<stage>/usr && LD_LIBRARY_PATH=<stage>/usr/lib ./App
 ```
 
-- **Installing.** Upstream Cosmoe hard-codes `/usr/share/wayland-sessions` (a plain `--prefix=$HOME/x` install fails) and its DESTDIR install deletes `libbe.so*` from the host's `/usr/local/lib`. Both are fixed in Kireji; DESTDIR installs work either way.
+- **Installing.** Upstream Cosmoe hard-codes `/usr/share/wayland-sessions` (a plain `--prefix=$HOME/x` install fails) and its DESTDIR install deletes `libbe.so*` from the host's `/usr/local/lib`. Both are fixed in Hokku; DESTDIR installs work either way.
 - **Debug by default.** The default build is a debug build (`libbe` is 27 MB); use `--buildtype=release` for packaging.
 - **Arch prerequisites:** `meson` (plus optional `libicns`).
 - **Ubuntu prerequisites:** see the apt list in Folio's `.github/workflows/appimage.yml`.
@@ -79,7 +79,7 @@ Folio's `packaging/appimage/build-appimage.sh` (plus `AppRun`, `fonts.conf`, a `
 
 1. **Build Cosmoe** (release) into a stage. Build the app with `LDFLAGS=-s`; stripping is safe because `.cosmoe_rsrc` is an allocated section.
 2. **Assemble the AppDir:** `usr/bin/<App>`, then `libbe.so`, `libtracker.so` and both backend plugins in `usr/lib`. Add `usr/lib/addons/` (Translators, control_look), `usr/share/cosmoe/{mime_db,artwork,locale}`, the Noto fonts the app uses (Regular, Bold, Italic, BoldItalic, Mono), `etc/fonts/fonts.conf`, and the licences (yours plus Cosmoe's `License.md`).
-3. **Reset RUNPATHs before linuxdeploy:** `$ORIGIN` for `usr/lib/*.so`, `$ORIGIN/../..` for add-ons. Cosmoe v0.9.0 bakes in `/usr/lib` (newer Cosmoe and Kireji set no RUNPATH on Linux) and linuxdeploy only *appends*, so otherwise the host's ICU, pango and cairo win. linuxdeploy contains a `patchelf`: extract it with `--appimage-extract`.
+3. **Reset RUNPATHs before linuxdeploy:** `$ORIGIN` for `usr/lib/*.so`, `$ORIGIN/../..` for add-ons. Cosmoe v0.9.0 bakes in `/usr/lib` (newer Cosmoe and Hokku set no RUNPATH on Linux) and linuxdeploy only *appends*, so otherwise the host's ICU, pango and cairo win. linuxdeploy contains a `patchelf`: extract it with `--appimage-extract`.
 4. **Run linuxdeploy** with `--executable`, `--deploy-deps-only=` for every add-on and backend, `--desktop-file`, `--icon-file` and `--custom-apprun`. Set `NO_STRIP=1`: its bundled `strip` can't read `.relr.dyn` sections from newer distros.
 5. **AppRun:** set `FONTCONFIG_FILE` (a conf that `<include>`s `/etc/fonts/fonts.conf` and adds `<dir prefix="relative">../../usr/share/fonts</dir>`) and `TRANSLATORS`, then `exec` the binary.
 6. **Pack:** `appimagetool --no-appstream`. Pin both tools' release tags (e.g. linuxdeploy `1-alpha-20251107-1`, appimagetool `1.9.1`). Set `APPIMAGE_EXTRACT_AND_RUN=1` in CI, which has no FUSE.
