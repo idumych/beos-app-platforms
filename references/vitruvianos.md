@@ -7,16 +7,13 @@ V\OS runs the Haiku API on a Linux kernel, on a Debian trixie userland. Apps shi
 There are two ways to get headers and libraries:
 
 - **On V\OS itself:** 0.6.x ships headers in `/system/develop/headers`, and newer builds have `pkg-config vos` from `vos-dev`. Link `-lbe -lroot -ltracker -ltranslation`.
-  For the 0.6.x headers, add these include dirs: `.`, `os` and `os/*` subdirs, `posix`, `build`, `build/config_headers`, `config`. Also add `-include LinuxBuildCompatibility.h -fPIC`. Folio's Makefile has the full list.
-- **On a plain Linux host:** build a link-time SDK from VitruvianOS's source. Folio's `tools/vos-sdk/make-sdk.sh` (plus `vos-0.6.2-linkonly.patch`) does it in about 4 minutes and produces `.vos-sdk/sdk/{include,lib,bin,linkdeps}` and `env.sh`. Reuse it:
-  - It needs `git cmake ninja g++ gcc bison m4 make pkg-config`. A shell *alias* for ninja doesn't count; the binary must exist.
-  - Arch-family hosts report the compiler triple `x86_64-pc-linux-gnu`, which VitruvianOS's `engine.cmake` rejects. Pass `-DVOS_DYNAMIC_LINKER=/lib64/ld-linux-x86-64.so.2`.
-  - These libraries only prove the link. The app uses the ones installed on V\OS at runtime.
-- **In CI (the default for release packages; amd64 and arm64):** build natively, not cross. GitHub's free `ubuntu-24.04` and `ubuntu-24.04-arm` runners, each in a `debian:trixie` container (V\OS's userland, glibc ≤ 2.41), build the SDK with an arch-aware `make-sdk.sh` and then the `.deb`. ivpn-vitruvian (github.com/idumych/ivpn-vitruvian) is the template: `.github/workflows/build.yml` and `tools/vos-sdk/make-sdk.sh`.
+  For the 0.6.x headers, add these include dirs: `.`, `os` and `os/*` subdirs, `posix`, `build`, `build/config_headers`, `config`. Also add `-include LinuxBuildCompatibility.h -fPIC`. `templates/Makefile` has the full list.
+- **Elsewhere: a link-time SDK** built from VitruvianOS's source by `templates/tools/vos-sdk/make-sdk.sh` (plus `vos-0.6.2-linkonly.patch`), producing `sdk/{include,lib,bin,linkdeps}` and `env.sh`. It runs natively on amd64 or arm64 **Debian trixie** (V\OS's userland, glibc 2.41); on another host, run it in a `debian:trixie` container. Its libraries only prove the link: the app uses the ones installed on V\OS at runtime.
+- **In CI (release packages, amd64 and arm64):** `templates/.github/workflows/deb.yml` builds natively, not cross: GitHub's free `ubuntu-24.04` and `ubuntu-24.04-arm` runners, each in a `debian:trixie` container, build the SDK (cached per arch) and then the `.deb`. What it learned:
   - **apt build deps:** take the `-dev` list from VitruvianOS's own `.github/workflows/ccpp-arm64.yml` (at the release tag) and drop image tooling and the kits the link-only patch removes (pipewire, gstreamer, bluetooth, nm). With fewer packages, `rc` fails on a missing `FL_LIBRARY` (`libfl-dev`) and libbe on `zlib.h`, one error per run.
-  - **Per-arch settings:** `VOS_DYNAMIC_LINKER` = `/lib64/ld-linux-x86-64.so.2` or `/lib/ld-linux-aarch64.so.1`; `-DVITRUVIAN_TARGET_ARCH=amd64|arm64`; header dir `os/arch/x86_64|arm64`. With every dep from apt, Folio's ICU/flex/systemd bootstrapping isn't needed.
+  - **Per-arch settings:** `VOS_DYNAMIC_LINKER` = `/lib64/ld-linux-x86-64.so.2` or `/lib/ld-linux-aarch64.so.1`; `-DVITRUVIAN_TARGET_ARCH=amd64|arm64`; header dir `os/arch/x86_64|arm64`.
   - Use `fail-fast: false` so one arch's failure doesn't cancel the other, and don't send cmake/ninja output to `/dev/null`: CI only shows "exit code 1".
-  - **Releases:** let the tag-triggered run create the release as a **prerelease** and attach the `.deb`s + `SHA256SUMS`. Test from those URLs in the VM, then `gh release edit <tag> --prerelease=false --latest`. VirtualBox can't run arm64 guests on an x86 host, so arm64 gets static checks only (ELF machine byte at offset 18 = `b7`, glibc), and the release notes say so.
+  - VirtualBox can't run arm64 guests on an x86 host, so arm64 gets static checks only (ELF machine byte at offset 18 = `b7`, glibc), and the release notes say so. Releasing: release.md.
 
 Resources: `rc` → `xres -o <bin>` → `resattr -O -o <bin>`. V\OS keeps the app signature both as resources and as attributes. The host-built `xres`/`resattr` need **absolute paths**.
 
@@ -25,7 +22,7 @@ Resources: `rc` → `xres -o <bin>` → `resattr -O -o <bin>`. V\OS keeps the ap
 
 ## Package a .deb
 
-Folio's `packaging/build-deb.sh` is a template. The parts that matter:
+`templates/packaging/build-deb.sh` and `postinst.in` do this. What they rely on:
 
 - **Strip at link time** (`LDFLAGS=-s`). `xres` appends the resources, so a later strip would remove them.
 - **dpkg drops extended attributes,** and V\OS keeps BEOS attributes as `user.beos.*` xattrs. Ship them in a tarball (`/usr/share/<pkg>/apps_attrs.tar`) and restore them in `postinst` with `getfattr`/`setfattr`; that's how V\OS's own package does it. Add `BEOS:TYPE` = `application/x-vnd.Be-elfexecutable`, stored as `MIMS` + the NUL-terminated string.
@@ -69,18 +66,22 @@ The live session runs at 1280×800.
 - **Don't** use the text consoles (Ctrl+Alt+F2) and **don't** read the image's `/etc/shadow`: auto mode blocks it as credential exploration. Use the desktop session.
 - **Terminal:** click the Deskbar "VitruvianOS" title at (1210,11), then Applications (1040,226), move left (880,226), down to Terminal at about (885,607), and click. Installed apps appear in the same menu.
 - **Command key is Ctrl.** Alt+key types the letter instead; undo it with Backspace `k:0e,8e`. Ctrl+Tab doesn't switch windows: quit the app or click the other window.
-- **Tools:** no `wget` or `file`; use `curl`. There's no SSH, so use the release URLs or a LAN-IP HTTP server for files.
+- **Tools:** no `wget` or `file`; use `curl`. No SSH out of the box; set it up once (below).
 - **Persistence:** writes to the live session survive a VM restart (the VDI is writable). The welcome screen comes back each boot.
+
+## SSH (first time, or when it refuses after a boot)
+
+Open a Terminal on the desktop (above), then type each line with `t:…` and `k:1c,9c`:
+
+    mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    echo '<your public key line>' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
+    sudo systemctl enable --now ssh || sudo service ssh start || sudo /usr/sbin/sshd
+
+After a reboot only the last line is needed: the live session keeps its files. The keymap is US-International, so check what you typed with `ocr-find.sh shot.png --text` before pressing Enter. Add a port forward first (VM powered off): `VBoxManage modifyvm <vm> --natpf1 "ssh,tcp,127.0.0.1,<port>,,22"`.
 
 ## Test checklist
 
-```sh
-cd /tmp && curl -fsSLO <release URL>/<pkg>_<v>-1_<arch>.deb && sha256sum <pkg>_*.deb   # <arch>: amd64 or arm64
-sudo apt install -y ./<pkg>_<v>-1_<arch>.deb && dpkg -s <pkg> | grep Version
-getfattr -d -m user.beos /system/apps/<App>      # signature attributes restored?
-ls /tmp/*.rsrc                                   # should not exist (see the rc trap above)
-(<cmd> > /tmp/app.log 2>&1 &)
-```
+The standard release checks (install, attributes, binary checksum, launch, log, quit) are in release-test.md. Also check `ls /tmp/*.rsrc`: it should not exist (see the rc trap above).
 
 If attributes are missing, reproduce through dpkg itself: `sudo dpkg --unpack x.deb`, add `set -x; exec 2>>/tmp/pi.log` to `/var/lib/dpkg/info/<pkg>.postinst` (and change its `>/dev/null` to the log), then `sudo dpkg --configure <pkg>`. Manual runs from a shell can pass for unrelated reasons (cwd, file names you happened to choose).
 
@@ -88,7 +89,7 @@ Open every menu's items, About included: an item that sends `B_ABOUT_REQUESTED` 
 
 **Apps that need an account** (VPN clients, sync tools): a logged-out test stops at the login screen. Never ask the user for credentials or type them into a VM. Test install, launch, signature and the screens reachable without logging in; list the rest under "Not tested" in the release notes, and offer that the user can log in themselves in the VM.
 
-Then the smoke test in SKILL.md (Ctrl+key = `k:1d,<code>,<code|80>,9d`), with these V\OS specifics:
+V\OS specifics (Ctrl+key = `k:1d,<code>,<code|80>,9d`):
 
 - **Node-monitor messages** carry `virtual:node` (node_ref) and `virtual:directory` / `virtual:from directory` / `virtual:to directory` (entry_refs), not Haiku's ints. Handle both, with a path fallback.
 - **Trash:** `find_directory(B_TRASH_DIRECTORY)` gives `~/config/data/Trash/files`. Write a freedesktop `.trashinfo` (URL-encoded `Path=`, `DeletionDate=`) into the sibling `info/`, and Tracker's Restore works. GNOME and KDE don't look there, though.

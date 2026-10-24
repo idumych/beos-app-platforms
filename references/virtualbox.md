@@ -12,7 +12,7 @@ Run `VBoxManage list vms` and `list runningvms` before doing anything. Only driv
 | `<app>-haiku` | Haiku R1/beta6 anyboot (+ a work disk) | SSH on 127.0.0.1:2222; gcc, make, haiku_devel; builds the hpkg |
 | `<app>-vos` | VitruvianOS raw image | UEFI, 1280×800, live user `vos-live` |
 
-Keep the machine-specific list (names, SSH aliases, what's installed) in project memory or notes, not in this skill.
+Releases use two shared VMs, `haiku-b6-test` and `vos-test` (release-test.md § Test VMs). Keep the machine-specific list (names, SSH aliases, keys, what's installed) in project memory or notes, not in this skill.
 
 ## Create a VM
 

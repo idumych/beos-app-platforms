@@ -3,7 +3,7 @@
 **Use Hokku** (github.com/idumych/hokku, branch `hokku`), the user's fork of Cosmoe (github.com/haydentech/cosmoe, MIT licence). Cosmoe is the Haiku API as a C++ library on X11, Wayland, macOS and Windows; Hokku follows it and adds fixes for freestanding Haiku/Renku app ports. Upstream doesn't accept AI contributions, so:
 
 - **Fix Cosmoe bugs in Hokku, not with workarounds in the app.** Commit the fix to the `hokku` branch (a new commit; don't rewrite it), list it under "Changes from Cosmoe" in Hokku's README, and rebuild the app. Never open issues or pull requests upstream.
-- The haiku-onboard templates build against Hokku by default (`COSMOE_REPO`/`COSMOE_TAG` in `haiku-app.env` override it). CI caches the build by the commit the branch points at, so a new Hokku commit rebuilds it (about 15 minutes).
+- The templates (`templates/`) build against Hokku by default (`COSMOE_REPO`/`COSMOE_TAG` in `haiku-app.env` override it). CI caches the build by the commit the branch points at, so a new Hokku commit rebuilds it (about 15 minutes).
 
 What it is like:
 
@@ -71,11 +71,11 @@ make COSMOE_ROOT=<stage>/usr && LD_LIBRARY_PATH=<stage>/usr/lib ./App
 - **Installing.** Upstream Cosmoe hard-codes `/usr/share/wayland-sessions` (a plain `--prefix=$HOME/x` install fails) and its DESTDIR install deletes `libbe.so*` from the host's `/usr/local/lib`. Both are fixed in Hokku; DESTDIR installs work either way.
 - **Debug by default.** The default build is a debug build (`libbe` is 27 MB); use `--buildtype=release` for packaging.
 - **Arch prerequisites:** `meson` (plus optional `libicns`).
-- **Ubuntu prerequisites:** see the apt list in Folio's `.github/workflows/appimage.yml`.
+- **Ubuntu prerequisites:** see the apt list in `templates/.github/workflows/appimage.yml`.
 
 ## Package an AppImage
 
-Folio's `packaging/appimage/build-appimage.sh` (plus `AppRun`, `fonts.conf`, a `.desktop` file and an icon) is a working template. Steps:
+`templates/packaging/appimage/build-appimage.sh` (plus `AppRun.in` and `fonts.conf`; it writes the `.desktop` file from `haiku-app.env`) does all of this. What it does, if you debug it:
 
 1. **Build Cosmoe** (release) into a stage. Build the app with `LDFLAGS=-s`; stripping is safe because `.cosmoe_rsrc` is an allocated section.
 2. **Assemble the AppDir:** `usr/bin/<App>`, then `libbe.so`, `libtracker.so` and both backend plugins in `usr/lib`. Add `usr/lib/addons/` (Translators, control_look), `usr/share/cosmoe/{mime_db,artwork,locale}`, the Noto fonts the app uses (Regular, Bold, Italic, BoldItalic, Mono), `etc/fonts/fonts.conf`, and the licences (yours plus Cosmoe's `License.md`).
@@ -90,7 +90,7 @@ Folio's `packaging/appimage/build-appimage.sh` (plus `AppRun`, `fonts.conf`, a `
 - `objdump -T` over all the ELF files gives the minimum glibc/libstdc++. On Ubuntu 24.04 that's GLIBC_2.38 / GLIBCXX_3.4.32, so Ubuntu 24.04, Fedora 39 or Debian 13 and newer.
 - `usr/share/doc/` gets the bundled libraries' Debian copyright files automatically on Ubuntu.
 
-**CI:** build on `ubuntu-24.04` with Cosmoe's apt dependencies, cache the Cosmoe stage keyed on the tag, upload an artifact, and on `v*` tags attach it to the release only if none is attached yet.
+**CI:** `templates/.github/workflows/appimage.yml` builds on `ubuntu-24.04`, caches the Hokku stage keyed on the commit its branch points at, runs the Wayland smoke test, uploads artifacts, and on `v*` tags attaches the AppImage only if none is attached yet.
 
 ## Headless testing (no VM needed)
 
@@ -112,4 +112,4 @@ APP=/path/App-x86_64.AppImage APP_NAME=App sh scripts/xtest.sh start shot:b    #
 - **Timing:** `LD_DEBUG` and gdb slow startup and can hide timing problems, so confirm without them.
 - **First run:** test both a **fresh HOME** and a reused one, and both the **mounted** and the extracted AppImage. The v0.9.0 translator failure only showed on a fresh HOME with the mounted image.
 
-Wayland is testable headlessly with **sway** on wlroots' headless backend (`WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_LIBINPUT_NO_DEVICES=1 sway -c <conf>`) and `grim` for screenshots: haiku-onboard's `packaging/appimage/wayland-smoke.sh`, run by `appimage.yml`. Headless **Weston** doesn't work: it offers no `wl_seat`, and a Cosmoe app opens its window and then exits with status 127. Still not testable headlessly: drag-and-drop from a Linux file manager (XDND). Use a desktop Linux VM (see virtualbox.md) or ask the user to try on their own session.
+Wayland is testable headlessly with **sway** on wlroots' headless backend (`WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_LIBINPUT_NO_DEVICES=1 sway -c <conf>`) and `grim` for screenshots: `templates/packaging/appimage/wayland-smoke.sh`, run by `appimage.yml`. Headless **Weston** doesn't work: it offers no `wl_seat`, and a Cosmoe app opens its window and then exits with status 127. Still not testable headlessly: drag-and-drop from a Linux file manager (XDND). Use a desktop Linux VM (see virtualbox.md) or ask the user to try on their own session.

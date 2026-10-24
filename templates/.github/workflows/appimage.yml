@@ -1,0 +1,83 @@
+name: appimage
+
+# The app for any x86_64 Linux desktop, built with Hokku (Cosmoe fork) on Ubuntu 24.04 so
+# the AppImage runs on that glibc or newer. Run it by hand before a release
+# (gh workflow run appimage.yml --ref <branch>) and test that artifact; on a
+# v* tag it attaches an AppImage to the release only if none is attached yet,
+# so the tested one that SHA256SUMS describes is kept.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  appimage:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: App settings
+        id: app
+        run: |
+          . ./haiku-app.env
+          echo "name=$APP_NAME" >> "$GITHUB_OUTPUT"
+          echo "apt=$APPIMAGE_APT_EXTRA" >> "$GITHUB_OUTPUT"
+          # Cache Hokku by the commit it builds, so a branch that moves rebuilds.
+          REPO=${COSMOE_REPO:-$(sed -n 's/^COSMOE_REPO=\${COSMOE_REPO:-\(.*\)}$/\1/p' packaging/appimage/build-appimage.sh)}
+          TAG=${COSMOE_TAG:-$(sed -n 's/^COSMOE_TAG=\${COSMOE_TAG:-\(.*\)}$/\1/p' packaging/appimage/build-appimage.sh)}
+          echo "cosmoe=$(echo $REPO | tr / -)-$(git ls-remote https://github.com/$REPO.git "$TAG" | cut -c1-12)" >> "$GITHUB_OUTPUT"
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential meson ninja-build pkg-config flex bison curl file \
+            libcairo2-dev libpng-dev libjpeg-dev libwebp-dev libtiff-dev \
+            zlib1g-dev libicu-dev libpango1.0-dev libicns-dev libraw-dev \
+            libpixman-1-dev libfontconfig1-dev libglib2.0-dev \
+            libx11-dev libx11-xcb-dev libxcursor-dev libxrandr-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev \
+            wayland-protocols libfuse3-dev desktop-file-utils \
+            ${{ steps.app.outputs.apt }}
+
+      - name: Cache Cosmoe build
+        uses: actions/cache@v4
+        with:
+          path: .cosmoe/stage
+          key: cosmoe-${{ steps.app.outputs.cosmoe }}-ubuntu-24.04-release
+
+      - name: Build AppImage
+        run: sh packaging/appimage/build-appimage.sh
+
+      - name: Wayland smoke test (headless sway)
+        # Cosmoe picks its Wayland backend from WAYLAND_DISPLAY / COSMOE_BACKEND. Start the
+        # AppImage on a headless sway, check it stays up, and keep a screenshot to look at.
+        timeout-minutes: 10
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive timeout 300 apt-get install -y --no-install-recommends sway grim
+          sh packaging/appimage/wayland-smoke.sh ${{ steps.app.outputs.name }}-*.AppImage wayland-smoke
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wayland-smoke
+          path: wayland-smoke/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AppImage
+          path: ${{ steps.app.outputs.name }}-*.AppImage
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" --json assets --jq '.assets[].name' | grep -q '\.AppImage$'; then
+            echo "Release already has an AppImage; leaving it."
+          else
+            gh release upload "${GITHUB_REF_NAME}" ${{ steps.app.outputs.name }}-*.AppImage
+          fi

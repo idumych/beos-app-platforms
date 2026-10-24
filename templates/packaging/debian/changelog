@@ -1,0 +1,5 @@
+@APP_CMD@ (@VERSION@-1) unstable; urgency=medium
+
+  * First release.
+
+ -- @PACKAGER@  @RFC2822_DATE@

@@ -1,41 +1,20 @@
 # Worked example: Folio
 
-Folio (github.com/idumych/folio) is a OneNote-style notebook app: Markdown pages, `[[wiki links]]` that are rewritten when pages move, tags, to-dos and attachments. It ships on all three platforms from one tree. Use its files as templates for a new app:
+Folio (github.com/idumych/folio) is a OneNote-style notebook app: Markdown pages, `[[wiki links]]` that are rewritten when pages move, tags, to-dos and attachments. It ships on all three platforms from one tree and was onboarded with `templates/` for 0.1.3, so it shows what an onboarded app looks like:
 
 | Piece | Folio file |
 |---|---|
-| Platform-detecting Makefile (Haiku, V\OS via pkg-config or headers, Cosmoe, `make deb`/`hpkg`) | `Makefile` |
-| Haiku/Renku package | `packaging/haiku/build-hpkg.sh`, `PackageInfo.in` |
-| VitruvianOS package (attributes tarball + postinst) | `packaging/build-deb.sh`, `packaging/debian/{postinst,changelog,copyright}` |
-| VitruvianOS link-time SDK | `tools/vos-sdk/make-sdk.sh`, `vos-0.6.2-linkonly.patch` |
-| AppImage | `packaging/appimage/{build-appimage.sh,AppRun,fonts.conf,folio.desktop,folio.svg,folio.png}` |
-| CI | `.github/workflows/test.yml` (unit tests), `appimage.yml` (AppImage; release attach) |
-| Type-check against real Haiku headers on Linux | `tools/typecheck/haiku-check.sh` |
-| Cosmoe define and code | `FOLIO_COSMOE` in `Vault.cpp` (`_Watch`, `FindNumber`, `_EventEntry`), `Widgets.cpp` (`OpenEntry`/`OpenURL`), `NoteView.cpp` (faces), `Constants.h` |
+| App settings for the pipeline | `haiku-app.env` (feature checks `welcome rename-links external-move`, three `EVIDENCE_n` rules) |
+| Feature test | `release/test-plan.md`: rename a page in the app, then `mv` it in a shell while Folio runs, and check the links on disk; `{p}` in the names keeps each platform's evidence distinct |
+| Platform-detecting Makefile | `Makefile` (Haiku; V\OS via `pkg-config vos` or `/system/develop/headers`; Cosmoe via `COSMOE_ROOT`) |
+| Packaging, CI, type-check, V\OS SDK | template copies: `packaging/`, `.github/workflows/`, `tools/` |
+| Cosmoe-specific code | `FOLIO_COSMOE` in `Vault.cpp` (`_Watch`, `FindNumber`, `_EventEntry`), `Widgets.cpp` (`OpenEntry`/`OpenURL`), `NoteView.cpp` (faces), `Constants.h` |
 
-## Folio's release checklist
-
-- **Version** lives in: `Folio.rdef` (`middle`/`minor`), `packaging/build-deb.sh`, `packaging/haiku/build-hpkg.sh` and `packaging/appimage/build-appimage.sh` (`VERSION=`), `packaging/debian/changelog`, the file names in `README.md`, and a new `packaging/release-notes-<v>.md`.
-- **Host checks:** `make test` (38+ checks), `sh tools/typecheck/haiku-check.sh`, then `. .vos-sdk/sdk/env.sh && make` and `make deb`.
-- **hpkg:** built over `ssh folio-haiku` (the Haiku beta6 VM).
-- **Release assets:** `folio_<v>-1_amd64.deb`, `folio-<v>-1-x86_64.hpkg`, `Folio-<v>-x86_64.AppImage`, `SHA256SUMS`.
-
-## Folio's core feature test (run it on every platform)
-
-1. A fresh launch creates `~/Notebooks/Welcome/Getting Started/` with three pages.
-2. Rename "Start Here" through the app (command key + R). Then `Links and Renaming.md` contains `[[New]]`, `[[New#Links]]` and `[[New|the welcome page]]`.
-3. With Folio running, `mv` that page in a terminal. All three links follow.
-4. `mv` a **section folder**, then a page inside it. The second rename is what catches stale path watches on Cosmoe.
-5. Ctrl/Alt-click the red `[[My First Idea]]`: the page is created. Tick a `[ ]`: `FOLIO:open_tasks` drops.
-6. Attach an image with command key + I: a thumbnail appears (on Cosmoe, also on a fresh-HOME first run).
-7. Move to Trash: check the platform's Trash location (see the cheat sheet).
-8. The log stays empty.
-
-Check with `grep -o '\[\[[^]]*\]\]' *.md` in the notebook folder.
+Its portable core (`MarkdownScan`, `LinkGraph`) has no Haiku headers, so `make test` runs anywhere, and its node-monitor handling accepts Haiku's, V\OS's and Cosmoe's message layouts, with a path fallback.
 
 ## Where Folio has been verified (Oct 2026)
 
-- **Haiku R1/beta6** (hrev59866): full pass. This is the hpkg build machine.
-- **Renku OS** nightly build00055: full pass with the beta6-built hpkg.
-- **VitruvianOS 0.6.2:** full pass, including Tracker drag-and-drop and restoring from the Trash.
-- **Linux** (CachyOS, X11 under Xvfb + Openbox): full pass with the CI AppImage. Not tested: Wayland, XDND.
+- **Haiku R1/beta6** (hrev59866): full pass (0.1.2 by hand; 0.1.3 through the release gate).
+- **Renku OS** nightly build00055: full pass with the beta6-built hpkg (0.1.2).
+- **VitruvianOS 0.6.2** amd64: full pass, including Tracker drag-and-drop and restoring from the Trash (0.1.2); 0.1.3 through the gate. arm64: static checks only.
+- **Linux**: CI AppImage under Xvfb + Openbox (X11), full pass; Wayland: CI smoke test on headless sway (0.1.3). Not tested: interactive Wayland, XDND.

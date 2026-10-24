@@ -75,28 +75,15 @@ when a dependency updates system packages (e.g. ICU); `shutdown -r` and reconnec
 
 ## Build an hpkg
 
-Inside the guest, `pkgman install gcc make haiku_devel` (only what's missing). Then from the host:
+The pipeline builds it inside a Haiku R1/beta6 VM with `templates/packaging/build-hpkg.sh`
+(release.md § Build the .hpkg). What that script relies on, if you write or debug one:
 
-```sh
-git archive HEAD | ssh <alias> 'rm -rf ~/rel && mkdir ~/rel && tar -x -C ~/rel && cd ~/rel && make hpkg'
-scp <alias>:rel/<pkg>.hpkg .
-```
+- **Strip at link time** (`LDFLAGS=-s`): `xres` appends resources after the ELF data, so stripping afterwards removes them.
+- **Tree** relative to `/boot/system`: `apps/<App>`, `bin/<cmd>` → `../apps/<App>`, `data/deskbar/menu/Applications/<App>` → `../../../../apps/<App>`, `documentation/packages/<pkg>/`. Run `mimeset -f` on the binary; `package create` keeps attributes.
+- **`.PackageInfo`:** `provides { <pkg> = <v>  app:<App> = <v>  cmd:<cmd> }` takes no revision; `requires { haiku >= r1~beta6 }` lets it install on Renku too. `licenses` must name a file in `/boot/system/data/licenses`.
+- `finddir B_USER_NONPACKAGED_DIRECTORY` exists, but there's **no** `B_USER_NONPACKAGED_APPS_DIRECTORY` constant. For a `make install`, append `/apps` yourself.
 
-The pattern a packaging script should follow (Folio's `packaging/haiku/build-hpkg.sh` is a template):
-
-1. **Build with `LDFLAGS=-s`.** `xres` appends resources after the ELF data, so stripping afterwards would remove them.
-2. **Lay out a tree** relative to `/boot/system`: `apps/<App>`, `bin/<cmd>` (link `../apps/<App>`), `data/deskbar/menu/Applications/<App>` (link `../../../../apps/<App>`), and `documentation/packages/<pkg>/`.
-3. **Run `mimeset -f`** on the binary. `package create` keeps attributes.
-4. **Write `.PackageInfo`:**
-   - `name`, `version <v>-<rev>`, `architecture $(getarch)`
-   - `summary`, `description`, `packager`, `vendor`, `copyrights`, `licenses`, `urls`
-   - `provides { <pkg> = <v>  app:<App> = <v>  cmd:<cmd> }` (no revision in `provides`)
-   - `requires { haiku >= r1~beta6 }`
-5. **Pack it:** `package create -C <tree> <out>.hpkg`. Verify with `package list <out>.hpkg`.
-
-`finddir B_USER_NONPACKAGED_DIRECTORY` exists, but there's **no** `B_USER_NONPACKAGED_APPS_DIRECTORY` constant. For a `make install`, append `/apps` yourself.
-
-So far packages have been **built** on a Haiku beta6 VM and **tested** on Renku. Building directly on Renku should work the same way, but check that its repositories provide `gcc`/`haiku_devel` first.
+So far packages have been **built** on Haiku beta6 and **tested** on Renku. Building directly on Renku should work the same way, but check that its repositories provide `gcc`/`haiku_devel` first.
 
 ## Test checklist (Alt is the command key)
 
@@ -106,7 +93,7 @@ listattr /boot/system/apps/<App> | grep BEOS # APP_SIG, APP_FLAGS, APP_VERSION, 
 (<cmd> > /tmp/app.log 2>&1 &)                # launch with a log
 ```
 
-Then the smoke test in SKILL.md, plus whichever of these the app uses:
+The standard release checks are in release-test.md. Platform specifics, for whichever of these the app uses:
 
 - **Shortcuts:** Alt+key = `k:38,<code>,<code|80>,b8` (e.g. Alt+R = `k:38,13,93,b8`).
 - **Quit:** `hey <App> quit`. It may print "Error when sending message"; that's harmless.
