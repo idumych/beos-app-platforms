@@ -4,7 +4,7 @@ A [Claude Code](https://claude.com/claude-code) skill (also usable from opencode
 
 | Platform | Package | Tested in |
 |---|---|---|
-| [Haiku](https://www.haiku-os.org) R1/beta6 | `.hpkg`, x86_64 (arm64 has no target yet), built in a Haiku R1/beta6 VM | VirtualBox VM |
+| [Renku OS](https://github.com/RenkuOS/Source) (Haiku fork), Haiku R1/beta6 | `.hpkg`, x86_64 (arm64 has no target yet), built in a Haiku R1/beta6 VM | VirtualBox VM |
 | [VitruvianOS](https://v-os.dev) (a BeOS-like OS based on Linux) | `.deb` (amd64, arm64) | VirtualBox VM (amd64); static checks (arm64) |
 | Linux, through [Hokku](https://github.com/idumych/hokku) (a fork of [Cosmoe](https://github.com/haydentech/cosmoe)) | AppImage, x86_64 and aarch64 (X11 and Wayland) | Xvfb + Openbox (X11); X11 and headless sway in CI on both architectures |
 
@@ -13,7 +13,7 @@ It records what was learned shipping [Folio](https://github.com/idumych/folio) a
 - **Packaging for amd64 and arm64:** the `.hpkg` in a Haiku R1/beta6 VM (or on a GitHub runner with `cross-platform-actions`), x86_64 until Haiku has an arm64 target; the VitruvianOS `.deb` for **amd64 and arm64**, built natively per architecture in `debian:trixie` (with the attribute workaround); and a relocatable AppImage for **x86_64 and aarch64** that bundles both Cosmoe backends and is started under X11 and Wayland on each architecture in CI.
 - **Testing:** driving VMs headlessly, with keyboard scancodes, mouse input through the VirtualBox SDK (hovering before menu clicks), screenshots read with OCR, and one-time SSH into Haiku-family guests; Cosmoe builds under Xvfb on a display of your choice; and a **Wayland** smoke test on headless sway with `grim` screenshots (headless Weston has no seat, so Cosmoe apps quit there).
 - **Releases:** a complete pipeline: onboarding templates for any app (`haiku-app.env`, Makefile, packaging, CI), a build of all three from one commit, a scripted test of each package on its platform with evidence files, and a release gate that checks the raw evidence and stops for a human before anything is published. Written so that an agent, including a local model, can release an app unsupervised.
-- **Hokku:** Linux builds use [Hokku](https://github.com/idumych/hokku), a Cosmoe fork that takes AI-generated fixes and aims to be a library freestanding Haiku app ports can build against. Cosmoe bugs get fixed there, not worked around in each app; Cosmoe itself doesn't accept AI contributions.
+- **Hokku:** Linux builds use [Hokku](https://github.com/idumych/hokku), a Cosmoe fork that takes AI-generated fixes and aims to be a library freestanding Renku/Haiku app ports can build against. Cosmoe bugs get fixed there, not worked around in each app; Cosmoe itself doesn't accept AI contributions.
 - **Upstream reports:** where they go and how to write them.
 
 ## Install
@@ -26,7 +26,7 @@ git clone https://github.com/idumych/beos-app-platforms.git ~/.claude/skills/beo
 
 Or, to share it with one project's collaborators, put it in that project's `.claude/skills/beos-app-platforms/`.
 
-Claude loads it when a task involves building, porting, packaging, releasing or VM-testing a Haiku-API app, for example "test it on Haiku", "make a release" or "check the AppImage".
+Claude loads it when a task involves building, porting, packaging, releasing or VM-testing a Haiku-API app, for example "test it on Renku", "make a release" or "check the AppImage".
 
 ## Contents
 
@@ -36,7 +36,7 @@ Claude loads it when a task involves building, porting, packaging, releasing or 
 | `references/release.md` | The release procedure: phases, building (`.hpkg` in a VM, `.deb`s and AppImage in CI), release notes, publishing, rules |
 | `references/onboard.md` | Setting an app up for releases: `haiku-app.env`, the Makefile contract, templates, the app's test plan |
 | `references/release-test.md` | Testing each package on its platform and writing the evidence; the shared test VMs |
-| `references/haiku.md` | Haiku R1/beta6: VM, SSH, building the `.hpkg` in a VM or CI, checking it, tests, arm64 status |
+| `references/renku.md` | Renku OS / Haiku-family: VM, SSH, building the `.hpkg` in CI or a VM, checking it, tests |
 | `references/vitruvianos.md` | VitruvianOS: amd64/arm64 SDK and CI, `.deb` packaging, VM, tests |
 | `references/cosmoe-linux.md` | Hokku/Cosmoe: using and fixing Hokku, porting traps, Makefile branch, AppImage recipe, CI, headless X11 and Wayland testing |
 | `references/virtualbox.md` | Driving VMs: scancodes, mouse (hover before menu clicks), screenshots, moving files |

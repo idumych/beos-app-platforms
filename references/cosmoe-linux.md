@@ -1,6 +1,6 @@
 # Linux via Hokku/Cosmoe (AppImage)
 
-**Use Hokku** (github.com/idumych/hokku, branch `hokku`), the user's fork of Cosmoe (github.com/haydentech/cosmoe, MIT licence). Cosmoe is the Haiku API as a C++ library on X11, Wayland, macOS and Windows; Hokku follows it and adds fixes for freestanding Haiku app ports. Upstream doesn't accept AI contributions, so:
+**Use Hokku** (github.com/idumych/hokku, branch `hokku`), the user's fork of Cosmoe (github.com/haydentech/cosmoe, MIT licence). Cosmoe is the Haiku API as a C++ library on X11, Wayland, macOS and Windows; Hokku follows it and adds fixes for freestanding Haiku/Renku app ports. Upstream doesn't accept AI contributions, so:
 
 - **Fix Cosmoe bugs in Hokku, not with workarounds in the app.** Commit the fix to the `hokku` branch (a new commit; don't rewrite it), list it under "Changes from Cosmoe" in Hokku's README, and rebuild the app. Never open issues or pull requests upstream.
 - The templates (`templates/`) build against Hokku by default (`COSMOE_REPO`/`COSMOE_TAG` in `haiku-app.env` override it). CI caches the build by the commit the branch points at, so a new Hokku commit rebuilds it (about 15 minutes).

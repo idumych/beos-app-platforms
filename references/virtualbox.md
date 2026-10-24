@@ -8,6 +8,7 @@ Run `VBoxManage list vms` and `list runningvms` before doing anything. Only driv
 
 | VM | Image | Notes |
 |---|---|---|
+| `<app>-renku` | Renku nightly ISO | BIOS, 1024×768 |
 | `<app>-haiku` | Haiku R1/beta6 anyboot (+ a work disk) | SSH on 127.0.0.1:2222; gcc, make, haiku_devel; builds the hpkg |
 | `<app>-vos` | VitruvianOS raw image | UEFI, 1280×800, live user `vos-live` |
 
@@ -24,7 +25,7 @@ It converts a copy of the ISO or raw image to VDI (`convertfromraw`; never edits
 ## Keyboard: `scripts/vm.sh`
 
 ```sh
-VM=haiku-b6-test sh scripts/vm.sh "t:some text" k:1c,9c w:2 shot:name
+VM=folio-renku sh scripts/vm.sh "t:some text" k:1c,9c w:2 shot:name
 ```
 
 - `t:` uses `keyboardputstring`. It types fast in most guests, but slowly into a Haiku Terminal (about 30 characters a second).
@@ -51,7 +52,7 @@ VM=<vm> python3 scripts/mouse.py click X Y        # also: rclick, dclick, ctrlcl
 
 Coordinates are screenshot pixels. The script holds the button about 80 ms and moves in steps for drags, which suits Tracker drag-and-drop. Before quitting it calls `os._exit(0)`, because vboxapi's teardown prints a harmless traceback otherwise.
 
-- **Menu items need a hover first** (Haiku): an instant click on an item in a menu
+- **Menu items need a hover first** (Haiku/Renku): an instant click on an item in a menu
   that just opened is often ignored and the menu stays open. Move onto the item, wait, then
   click: `m:move,X,Y w:0.4 m:click,X,Y`. Submenus the same way: hover the parent item, move
   across into the submenu, hover the item, click.
@@ -60,7 +61,7 @@ Coordinates are screenshot pixels. The script holds the button about 80 ms and m
 
 ## Files in and out
 
-1. **Best:** SSH (Haiku; see haiku.md), then `scp` or `tar | ssh`.
+1. **Best:** SSH (Haiku-family; see renku.md), then `scp` or `tar | ssh`.
 2. **Published files:** `curl` the GitHub release URL from inside the guest. This is also the truest install test.
 3. **From the host:** run `python3 -m http.server PORT --bind <LAN-IP>` in a directory holding only what's needed, and stop it afterwards. Find the LAN IP with `ip route get 1.1.1.1 | grep -oP 'src \K\S+'`. **127.0.0.1 doesn't work:** VirtualBox 7 NAT blocks guest-to-host loopback (`10.0.2.2` gives connection refused). The host's ufw allows this, because NAT traffic comes from the host itself.
 4. **Tiny files without networking:** `echo <base64> | base64 -d | tar -xz` typed with `t:`.

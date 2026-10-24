@@ -18,7 +18,7 @@ cd "$(dirname "$0")/../.."
 ROOT=$(pwd)
 . ./haiku-app.env
 
-# Which Cosmoe to build: Hokku, the fork with fixes for freestanding Haiku app ports
+# Which Cosmoe to build: Hokku, the fork with fixes for freestanding Haiku/Renku app ports
 # (pointer events, tooltips, font styles). haiku-app.env may override COSMOE_REPO (owner/name
 # on GitHub) and COSMOE_TAG (a tag or branch), e.g. to try upstream haydentech/cosmoe.
 COSMOE_REPO=${COSMOE_REPO:-idumych/hokku}
