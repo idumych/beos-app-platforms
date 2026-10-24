@@ -9,9 +9,9 @@ A BeOS-style app is C++ written against the Be/Haiku API (BApplication, BWindow,
 
 | Platform | What it is | Package | Built where | Tested how |
 |---|---|---|---|---|
-| **Renku OS** | Fork of Haiku; still names its system package `haiku`, version `r1~beta6` | `.hpkg` (`package create`) | Inside a Haiku R1/beta6 VM, over SSH (installs on Renku too) | VirtualBox VM: keyboard, mouse, screenshots |
+| **Renku OS** | Fork of Haiku; still names its system package `haiku`, version `r1~beta6` | `.hpkg` (`package create`), x86_64 (arm64 blocked, see below) | Inside a Haiku R1/beta6 VM, over SSH (installs on Renku too) | VirtualBox VM: keyboard, mouse, screenshots |
 | **VitruvianOS** (V\OS) | Haiku API on a Linux kernel, Debian userland | `.deb` installing to `/system/apps`, **amd64 and arm64** | In CI, natively per architecture, with a link-time SDK | VirtualBox VM (UEFI; amd64 only) |
-| **Linux** | Any desktop, through the Cosmoe library (the Hokku fork) | AppImage | **CI** (Ubuntu 24.04) for releases; locally only for porting | Xvfb + Openbox (X11); headless sway in CI (Wayland) |
+| **Linux** | Any desktop, through the Cosmoe library (the Hokku fork) | AppImage, **x86_64 and aarch64** | **CI** (Ubuntu 24.04, natively per architecture) for releases; locally only for porting | Xvfb + Openbox (X11); in CI on both architectures, X11 and headless sway (Wayland) |
 
 Read the reference file for what you're doing:
 
@@ -42,7 +42,10 @@ Helper scripts in `scripts/` (read each script's header first):
 
 - **Never contact the Haiku project** (no Trac tickets, patches or forum posts), even for bugs that Renku or Cosmoe inherited from Haiku: the user says Haiku doesn't welcome AI contributions. Upstream reports go to **RenkuOS/Source** (AI-assisted work is explicitly allowed; keep write-ups short and plain); Cosmoe bugs are fixed in Hokku, never reported to haydentech/cosmoe (see below). File only after reproducing the bug in the platform's own code or bundled apps, not just in your app.
 - **Build release packages in CI, not against the user's local libraries,** unless the user says otherwise (release.md § CI). The `.hpkg` is built in a Haiku R1/beta6 VM.
-- **Target amd64 and arm64 for VitruvianOS** by default: one `deb.yml` job per architecture on `ubuntu-24.04` / `ubuntu-24.04-arm` in `debian:trixie` (`templates/.github/workflows/deb.yml`). arm64 gets static checks, since VirtualBox can't run arm64 guests on x86.
+- **Build for both amd64 (x86_64) and arm64 (aarch64) on all three platforms.** Every release ships both wherever the platform has an arm64 target:
+  - **VitruvianOS:** one `deb.yml` job per architecture on `ubuntu-24.04` / `ubuntu-24.04-arm` in `debian:trixie`. The arm64 `.deb` gets static checks (VirtualBox can't run arm64 guests on x86).
+  - **Linux:** one `appimage.yml` job per architecture on the same runners; each starts its AppImage under X11 and Wayland, so aarch64 runs on real arm64 hardware.
+  - **Haiku/Renku: arm64 is blocked** (Oct 2026): no R1/beta6 arm64 release, no arm64 package repository (so no `gcc`/`haiku_devel`), Renku ships no arm64 ISO, and `cross-platform-actions` has Haiku for x86-64 only. Check again at every release (renku.md § arm64); when a target appears, add the arm64 `.hpkg` and its test to the pipeline. Until then the release notes say Haiku is x86_64 only. Don't ship an untested cross-built `.hpkg`.
 - **Linux builds use Hokku**, the user's Cosmoe fork (github.com/idumych/hokku): fix Cosmoe bugs there instead of working around them in apps, and never contribute upstream (cosmoe-linux.md).
 - **Linux means X11 and Wayland:** Cosmoe picks its backend from `WAYLAND_DISPLAY` / `COSMOE_BACKEND`; the AppImage bundles both, and `appimage.yml` smoke-tests it on headless sway (cosmoe-linux.md).
 - **Test the exact artifact you publish.** Build every package from one commit, test those files, publish them only after the release gate passes and a human says so, then re-test from the release URLs.

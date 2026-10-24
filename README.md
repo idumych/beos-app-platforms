@@ -4,13 +4,13 @@ A [Claude Code](https://claude.com/claude-code) skill (also usable from opencode
 
 | Platform | Package | Tested in |
 |---|---|---|
-| [Renku OS](https://github.com/RenkuOS/Source) (Haiku fork), Haiku R1/beta6 | `.hpkg`, built in GitHub CI on Haiku R1/beta6 | VirtualBox VM |
+| [Renku OS](https://github.com/RenkuOS/Source) (Haiku fork), Haiku R1/beta6 | `.hpkg`, x86_64 (arm64 has no target yet), built in a Haiku R1/beta6 VM | VirtualBox VM |
 | [VitruvianOS](https://v-os.dev) (Haiku API on Linux) | `.deb` (amd64, arm64) | VirtualBox VM (amd64); static checks (arm64) |
-| Linux, through [Hokku](https://github.com/idumych/hokku) (a fork of [Cosmoe](https://github.com/haydentech/cosmoe)) | AppImage (X11 and Wayland) | Xvfb + Openbox (X11); headless sway in CI (Wayland) |
+| Linux, through [Hokku](https://github.com/idumych/hokku) (a fork of [Cosmoe](https://github.com/haydentech/cosmoe)) | AppImage, x86_64 and aarch64 (X11 and Wayland) | Xvfb + Openbox (X11); X11 and headless sway in CI on both architectures |
 
 It records what was learned shipping [Folio](https://github.com/idumych/folio) and [Sheath](https://github.com/idumych/sheath) on all three:
 - **Porting:** the Makefile platform branches, plus the traps on each system (node monitoring, attributes, Trash, `entry_ref` names, font faces picked by style name, tooltips that never hide on Cosmoe, headers missing from R1/beta6).
-- **Packaging, all in CI:** the `.hpkg` in a Haiku R1/beta6 VM on a GitHub runner (`cross-platform-actions`); the VitruvianOS `.deb` for **amd64 and arm64**, built natively per architecture in `debian:trixie` (with the attribute workaround); and a relocatable AppImage that bundles both Cosmoe backends.
+- **Packaging for amd64 and arm64:** the `.hpkg` in a Haiku R1/beta6 VM (or on a GitHub runner with `cross-platform-actions`), x86_64 until Haiku has an arm64 target; the VitruvianOS `.deb` for **amd64 and arm64**, built natively per architecture in `debian:trixie` (with the attribute workaround); and a relocatable AppImage for **x86_64 and aarch64** that bundles both Cosmoe backends and is started under X11 and Wayland on each architecture in CI.
 - **Testing:** driving VMs headlessly, with keyboard scancodes, mouse input through the VirtualBox SDK (hovering before menu clicks), screenshots read with OCR, and one-time SSH into Haiku-family guests; Cosmoe builds under Xvfb on a display of your choice; and a **Wayland** smoke test on headless sway with `grim` screenshots (headless Weston has no seat, so Cosmoe apps quit there).
 - **Releases:** a complete pipeline: onboarding templates for any app (`haiku-app.env`, Makefile, packaging, CI), a build of all three from one commit, a scripted test of each package on its platform with evidence files, and a release gate that checks the raw evidence and stops for a human before anything is published. Written so that an agent, including a local model, can release an app unsupervised.
 - **Hokku:** Linux builds use [Hokku](https://github.com/idumych/hokku), a Cosmoe fork that takes AI-generated fixes and aims to be a library freestanding Renku/Haiku app ports can build against. Cosmoe bugs get fixed there, not worked around in each app; Cosmoe itself doesn't accept AI contributions.

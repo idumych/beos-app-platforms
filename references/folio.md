@@ -17,4 +17,4 @@ Its portable core (`MarkdownScan`, `LinkGraph`) has no Haiku headers, so `make t
 - **Haiku R1/beta6** (hrev59866): full pass (0.1.2 by hand; 0.1.3 through the release gate).
 - **Renku OS** nightly build00055: full pass with the beta6-built hpkg (0.1.2).
 - **VitruvianOS 0.6.2** amd64: full pass, including Tracker drag-and-drop and restoring from the Trash (0.1.2); 0.1.3 through the gate. arm64: static checks only.
-- **Linux**: CI AppImage under Xvfb + Openbox (X11), full pass; Wayland: CI smoke test on headless sway (0.1.3). Not tested: interactive Wayland, XDND.
+- **Linux** x86_64: CI AppImage under Xvfb + Openbox (X11), full pass; Wayland: CI smoke test on headless sway (0.1.3+). aarch64 (0.1.5): started under X11 and Wayland on GitHub's arm64 runners. Not tested: interactive Wayland, XDND, feature checks on aarch64.

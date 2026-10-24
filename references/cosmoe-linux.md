@@ -90,7 +90,7 @@ make COSMOE_ROOT=<stage>/usr && LD_LIBRARY_PATH=<stage>/usr/lib ./App
 - `objdump -T` over all the ELF files gives the minimum glibc/libstdc++. On Ubuntu 24.04 that's GLIBC_2.38 / GLIBCXX_3.4.32, so Ubuntu 24.04, Fedora 39 or Debian 13 and newer.
 - `usr/share/doc/` gets the bundled libraries' Debian copyright files automatically on Ubuntu.
 
-**CI:** `templates/.github/workflows/appimage.yml` builds on `ubuntu-24.04`, caches the Hokku stage keyed on the commit its branch points at, runs the Wayland smoke test, uploads artifacts, and on `v*` tags attaches the AppImage only if none is attached yet.
+**CI:** `templates/.github/workflows/appimage.yml` builds natively on `ubuntu-24.04` (x86_64) and `ubuntu-24.04-arm` (aarch64); `build-appimage.sh` picks linuxdeploy/appimagetool for `uname -m`. Each job caches its Hokku stage (keyed on the commit the branch points at and the arch), starts the AppImage under X11 (`x11-smoke.sh`: Xvfb + Openbox) and Wayland (`wayland-smoke.sh`), uploads `AppImage-<arch>` and `smoke-<arch>`, and on `v*` tags attaches each AppImage only if that file isn't attached yet.
 
 ## Headless testing (no VM needed)
 
@@ -99,6 +99,7 @@ The host needs `xorg-server-xvfb`, `openbox`, `xdotool` and ImageMagick.
 ```sh
 Xvfb :99 -screen 0 1280x800x24 -nolisten tcp &   # keep running
 DISPLAY=:99 openbox &                            # without a WM, Cosmoe windows get no focus or input
+until DISPLAY=:99 xdotool get_desktop >/dev/null 2>&1; do sleep 0.25; done   # WM ready; earlier maps can be lost
 APP=./App APP_NAME=App LIBDIR=<stage>/usr/lib sh scripts/xtest.sh start c:600,400 k:ctrl+r shot:a
 APP=/path/App-x86_64.AppImage APP_NAME=App sh scripts/xtest.sh start shot:b    # AppImage: no LIBDIR
 ```

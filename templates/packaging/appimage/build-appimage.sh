@@ -1,5 +1,5 @@
 #!/bin/sh
-# build-appimage.sh — the app for any x86_64 Linux desktop, as an AppImage,
+# build-appimage.sh — the app for any x86_64 or aarch64 Linux desktop, as an AppImage,
 # using Hokku (https://github.com/idumych/hokku, a fork of Cosmoe), the Haiku API as a
 # library on X11 and Wayland. Generic beos-app-platforms template: app-specific values
 # come from haiku-app.env.
@@ -8,6 +8,8 @@
 #
 # Run it in CI (.github/workflows/appimage.yml, Ubuntu 24.04), not on a
 # rolling-release host: the AppImage needs the oldest glibc it should run on.
+# It builds for the machine it runs on (uname -m): CI runs it on ubuntu-24.04 and
+# ubuntu-24.04-arm.
 # Builds Hokku into .cosmoe/ (unless COSMOE_STAGE points
 # at a DESTDIR install of it made with --prefix=/usr --libdir=lib), builds
 # the app against it, bundles both with linuxdeploy, packs with appimagetool.
@@ -23,7 +25,11 @@ COSMOE_REPO=${COSMOE_REPO:-idumych/hokku}
 COSMOE_TAG=${COSMOE_TAG:-hokku}
 LINUXDEPLOY_TAG=1-alpha-20251107-1
 APPIMAGETOOL_TAG=1.9.1
-ARCH=x86_64
+case "$(uname -m)" in
+	x86_64) ARCH=x86_64 ;;
+	aarch64|arm64) ARCH=aarch64 ;;
+	*) echo "build-appimage: unsupported architecture $(uname -m)" >&2; exit 1 ;;
+esac
 
 WORK="$ROOT/.cosmoe"
 OUT="$ROOT/${APP_NAME}-${VERSION}-${ARCH}.AppImage"

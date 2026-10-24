@@ -6,6 +6,16 @@ Renku OS (github.com/RenkuOS/Source) is a fork of Haiku that started in Septembe
 - **Nightlies:** `gh release view nightly -R RenkuOS/Source` (x86_64 and x86_gcc2h ISOs, each with a `.sha256`). Download into `~/Downloads` and check with `sha256sum -c`.
 - **Policy:** `AGENTS.md` in RenkuOS/Source, plus `RenkuOS/PlanAndGovernance` (CONTRIBUTING, REVIEW, DECISIONS). Machine-assisted work is allowed. Pull requests need a short human-style summary, a "How this was tested" section and a DCO `Signed-off-by`. Issues go to RenkuOS/Source. Renku has its own package repository ("Spritz Depot"); see its open issues for the submission process.
 
+## arm64
+
+Blocked as of Oct 2026; check at every release, and build an arm64 `.hpkg` as soon as one of these turns up:
+
+    curl -s -o /dev/null -w '%{http_code}\n' https://eu.hpkg.haiku-os.org/haiku/r1beta6/arm64/current/   # 404 = no arm64 R1/beta6 repo
+    gh release view nightly -R RenkuOS/Source --json assets -q '.assets[].name' | grep -i arm             # a Renku arm64 ISO?
+    curl -fsSL https://raw.githubusercontent.com/cross-platform-actions/action/master/readme.md | grep -A8 '(`haiku`)'   # Haiku arm64 in CI?
+
+Haiku's arm64 nightlies (`download.haiku-os.org/nightly-images/arm64/`) are experimental SD-card images with no package repository, and VirtualBox on an x86 host can't run arm64 guests; a QEMU `aarch64` VM would be the test machine. The `.hpkg` itself needs no changes beyond `getarch` reporting `arm64`.
+
 ## Make a test VM
 
 ```sh

@@ -18,6 +18,7 @@ DEB=${APP_CMD}_${V}-${REVISION}_amd64.deb          # tested in the vos-test VM
 DEB_ARM64=${APP_CMD}_${V}-${REVISION}_arm64.deb    # static checks (no arm64 VM on x86 hosts)
 HPKG=${APP_CMD}-${V}-${REVISION}-x86_64.hpkg
 APPIMG=${APP_NAME}-${V}-x86_64.AppImage
+APPIMG_ARM64=${APP_NAME}-${V}-aarch64.AppImage  # started in CI on arm64 hardware (X11 + Wayland)
 PLATFORMS="haiku vos linux"
 REQUIRED="install attrs launch $FEATURE_CHECKS log-clean quit"
 pass=0 fail=0
@@ -105,9 +106,35 @@ if [ -s "$D/$DEB_ARM64" ]; then
 		|| bad "vos-arm64 in SHA256SUMS" "$DEB_ARM64 is not listed"
 else bad "vos-arm64 artifact" "$D/$DEB_ARM64 missing (deb.yml builds amd64 and arm64)"; fi
 
+# the aarch64 AppImage: no arm64 desktop here, so appimage.yml starts it on GitHub's arm64
+# runner under X11 and Wayland; the evidence cites those smoke results
+f=$E/linux-arm64.txt
+if [ ! -s "$D/$APPIMG_ARM64" ]; then bad "linux-arm64 artifact" "$D/$APPIMG_ARM64 missing (appimage.yml builds x86_64 and aarch64)"
+elif [ ! -s "$f" ]; then bad "linux-arm64 evidence" "$f missing"
+else
+	ok "linux-arm64 artifact"
+	[ "$(field "$f" sha256)" = "$(sha256sum "$D/$APPIMG_ARM64" | cut -d' ' -f1)" ] && ok "linux-arm64 sha256" \
+		|| bad "linux-arm64 sha256" "evidence is for a different file than $D/$APPIMG_ARM64"
+	[ "$(field "$f" commit)" = "$HEAD" ] && ok "linux-arm64 commit" || bad "linux-arm64 commit" "tested build is from '$(field "$f" commit)', HEAD is $HEAD"
+	RUN=$(field "$f" ci-run)
+	got=$(gh run view "$RUN" --json headSha,conclusion,workflowName -q '.headSha+" "+.conclusion+" "+.workflowName' 2>/dev/null)
+	echo "$got" | grep -qx "$HEAD success appimage" && ok "linux-arm64 from CI run $RUN" \
+		|| bad "linux-arm64 ci" "ci-run '$RUN' is not a successful appimage run of HEAD (got: $got)"
+	for c in install x11 wayland; do
+		grep -qE "^CHECK $c PASS" "$f" && ok "linux-arm64 $c" || bad "linux-arm64 $c" "no 'CHECK $c PASS' line in $f"
+	done
+	grep -qx 'RESULT: PASS' "$f" && ok "linux-arm64 result" || bad "linux-arm64 result" "no 'RESULT: PASS' line"
+	for l in $E/linux-arm64-x11.log $E/linux-arm64-wayland.log; do
+		if [ ! -e "$l" ]; then bad "linux-arm64 log" "$l missing"
+		elif grep -qiE 'error|assert|crash|segment|abort|debugger|terminate|exception' "$l"; then bad "linux-arm64 log" "$(grep -iE 'error|assert|crash|segment|abort|exception' "$l" | head -1)"
+		else ok "linux-arm64 log $(basename "$l")"; fi
+	done
+	grep -q " $APPIMG_ARM64\$" "$D/SHA256SUMS" 2>/dev/null && ok "linux-arm64 in SHA256SUMS" || bad "linux-arm64 in SHA256SUMS" "$APPIMG_ARM64 is not listed"
+fi
+
 if [ -s "$D/SHA256SUMS" ] && (cd "$D" && sha256sum -c --quiet SHA256SUMS) >/dev/null 2>&1 \
-	&& [ "$(grep -c . "$D/SHA256SUMS")" = 4 ]; then ok SHA256SUMS
-else bad SHA256SUMS "$D/SHA256SUMS missing, wrong, or not exactly the 4 artifacts (hpkg, 2 debs, AppImage)"; fi
+	&& [ "$(grep -c . "$D/SHA256SUMS")" = 5 ]; then ok SHA256SUMS
+else bad SHA256SUMS "$D/SHA256SUMS missing, wrong, or not exactly the 5 artifacts (hpkg, 2 debs, 2 AppImages)"; fi
 
 echo
 if [ $fail = 0 ]; then

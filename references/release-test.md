@@ -12,6 +12,7 @@ Every platform gets the same standard checks, plus the app's own feature checks 
 | `log-clean` | the app's stdout/stderr log has no error, assert, crash or exception lines |
 | `quit` | after the app's own Quit command, its process is gone within 10 s |
 | `wayland` (Linux) | the CI smoke test's screenshot shows the window, its log is clean |
+| `x11`, `wayland` (Linux aarch64) | the arm64 CI job's smoke screenshots show the window, both logs are clean |
 
 ## Setup, every time
 
@@ -147,11 +148,28 @@ gate check it statically, and the release notes say it was not run.
 
 - `install`: `check-artifact.sh appimage` passed and the file is the CI artifact (`ci-run:`).
   `attrs`: `strings -a` of the extracted binary shows `$APP_SIG`.
-- `wayland`: look at `wayland-smoke/wayland-screenshot.png` from the same CI run, and cite it:
-  `CHECK wayland PASS wayland-smoke/wayland-screenshot.png: <what it shows>; app.log clean`.
+- `wayland`: look at `smoke-x86_64/wayland-smoke/wayland-screenshot.png` from the same CI run,
+  and cite it: `CHECK wayland PASS …/wayland-screenshot.png: <what it shows>; app.log clean`.
   Save its log as `$E/linux-wayland.log`.
 - No text at all in OCR means fonts are missing from the AppImage: a real bug
   (cosmoe-linux.md § Package an AppImage).
+
+## Linux aarch64 (the CI AppImage, on GitHub's arm64 runner)
+
+There's no arm64 desktop here, so the `aarch64` job of `appimage.yml` is the test machine: it
+started the AppImage under X11 and Wayland on real arm64 hardware and uploaded `smoke-aarch64`.
+Look at both screenshots, then write `$E/linux-arm64.txt`:
+
+    platform: linux-arm64
+    artifact: <App>-<V>-aarch64.AppImage
+    sha256: … / commit: … / ci-run: <the appimage.yml run>
+    CHECK install PASS check-artifact.sh appimage <file> -> CHECKS PASSED n (aarch64 binary)
+    CHECK x11 PASS smoke-aarch64/x11-smoke/x11-screenshot.png: <what it shows>; app.log <n> lines
+    CHECK wayland PASS smoke-aarch64/wayland-smoke/wayland-screenshot.png: <what it shows>; app.log <n> lines
+    RESULT: PASS
+
+and copy the two app logs to `$E/linux-arm64-x11.log` and `$E/linux-arm64-wayland.log`. The
+app's feature checks were not run on arm64: say so in the release notes.
 
 ## After publishing
 

@@ -66,11 +66,23 @@ hpkg)
 	for r in ${HPKG_REQUIRES_EXTRA:-}; do chk "requires $r" "grep -qF '$r' '$L'"; done
 	;;
 appimage)
-	chk name "basename '$FILE' | grep -qx '${APP_NAME}-${VERSION}-x86_64.AppImage'" "file name is not ${APP_NAME}-${VERSION}-x86_64.AppImage"
+	chk name "basename '$FILE' | grep -qxE '${APP_NAME}-${VERSION}-(x86_64|aarch64).AppImage'" "file name is not ${APP_NAME}-${VERSION}-x86_64.AppImage or -aarch64.AppImage"
+	case "$(basename "$FILE")" in *-aarch64.AppImage) AARCH=aarch64 EM=b7 ;; *) AARCH=x86_64 EM=3e ;; esac
 	cp "$FILE" "$TMP/a.AppImage" && chmod +x "$TMP/a.AppImage"
-	( cd "$TMP" && APPIMAGE_EXTRACT_AND_RUN=1 ./a.AppImage --appimage-extract >/dev/null 2>&1 )
+	# Unpack without needing to run it natively: run the runtime directly on a matching
+	# host, through qemu-user for the other architecture, or read the squashfs that follows
+	# the runtime's ELF image with unsquashfs.
+	if [ "$(uname -m)" = "$AARCH" ] || { [ "$AARCH" = aarch64 ] && [ "$(uname -m)" = arm64 ]; }; then
+		( cd "$TMP" && APPIMAGE_EXTRACT_AND_RUN=1 ./a.AppImage --appimage-extract >/dev/null 2>&1 )
+	elif command -v "qemu-$AARCH" >/dev/null 2>&1; then
+		( cd "$TMP" && "qemu-$AARCH" ./a.AppImage --appimage-extract >/dev/null 2>&1 )
+	elif command -v unsquashfs >/dev/null 2>&1; then
+		OFF=$(python3 -c 'import struct,sys; d=open(sys.argv[1],"rb").read(64); sh=struct.unpack_from("<Q",d,40)[0]; es,n=struct.unpack_from("<HH",d,58); print(sh+es*n)' "$TMP/a.AppImage")
+		unsquashfs -q -d "$TMP/squashfs-root" -o "$OFF" "$TMP/a.AppImage" >/dev/null 2>&1
+	fi
 	R="$TMP/squashfs-root"
-	chk binary "test -s '$R/usr/bin/$APP_NAME'"
+	chk binary "test -s '$R/usr/bin/$APP_NAME'" "could not unpack it (for $AARCH on $(uname -m) install qemu-user or squashfs-tools), or usr/bin/$APP_NAME is missing"
+	chk "$AARCH binary" "[ \"\$(od -An -tx1 -j18 -N1 '$R/usr/bin/$APP_NAME' | tr -d ' ')\" = $EM ]" "usr/bin/$APP_NAME is not an $AARCH ELF"
 	chk rsrc-section "readelf -S '$R/usr/bin/$APP_NAME' | grep -q cosmoe_rsrc" "no .cosmoe_rsrc section (resources not linked in)"
 	chk signature "strings -a '$R/usr/bin/$APP_NAME' | grep -qF '$APP_SIG'"
 	chk libbe "ls '$R'/usr/lib/libbe.so*"

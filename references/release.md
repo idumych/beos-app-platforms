@@ -20,7 +20,9 @@ the X Y to click. Either way, take a fresh screenshot before every click.
 |---|---|---|
 | Haiku R1/beta6 (installs on Renku too) | `<APP_CMD>-<V>-<REVISION>-x86_64.hpkg` | inside the `haiku-b6-test` VM |
 | VitruvianOS | `<APP_CMD>_<V>-<REVISION>_amd64.deb`, `_arm64.deb` | GitHub Actions, `deb.yml` (debian:trixie, one job per arch) |
-| Linux | `<APP_NAME>-<V>-x86_64.AppImage` | GitHub Actions, `appimage.yml` (Ubuntu 24.04, Hokku; also smoke-tests Wayland) |
+| Linux | `<APP_NAME>-<V>-x86_64.AppImage`, `-aarch64.AppImage` | GitHub Actions, `appimage.yml` (Ubuntu 24.04, Hokku, one job per arch; each starts its AppImage under X11 and Wayland) |
+
+Both architectures on every platform that has an arm64 target (SKILL.md rules). Haiku arm64 is blocked for now (renku.md § arm64): check at each release.
 
 ## Starting cold
 
@@ -57,7 +59,7 @@ Every session starts with:
 7. **Test** each artifact on its platform (release-test.md), producing `dist/V/evidence/`. A
    failure means fix the app, commit, push, back to 4.
 8. **Notes and sums:** `dist/V/release-notes.md` (below), then
-   `cd $D && sha256sum <amd64.deb> <arm64.deb> <hpkg> <AppImage> > SHA256SUMS`.
+   `cd $D && sha256sum <amd64.deb> <arm64.deb> <hpkg> <x86_64.AppImage> <aarch64.AppImage> > SHA256SUMS`.
 9. **Gate:** `$P/release-gate.sh`. Fix what it names. When it prints `GATE PASSED`, **stop**:
    report its output and wait for the human.
 10. **Publish** (only after the human says so; § Publish), then re-test from the release URLs.
@@ -97,10 +99,15 @@ host-built .deb once needed `cfsetispeed@GLIBC_2.42`, but V\OS has 2.41). Push, 
 Run the watches in the background. First runs take 20–30 minutes (Hokku, the V\OS SDK), later
 ones come from the cache. When done:
 
-    gh run download "$RUN" -n AppImage -D $D/; gh run download "$RUN" -n wayland-smoke -D $D/wayland-smoke
+    for a in x86_64 aarch64; do
+    	gh run download "$RUN" -n AppImage-$a -D $D/; gh run download "$RUN" -n smoke-$a -D $D/smoke-$a
+    	$P/check-artifact.sh appimage $D/${APP_NAME}-${V}-$a.AppImage
+    done
     gh run download "$DEB_RUN" -n deb-amd64 -D $D/; gh run download "$DEB_RUN" -n deb-arm64 -D $D/
     for f in $D/*.deb; do $P/check-artifact.sh deb $f; done
-    $P/check-artifact.sh appimage $D/${APP_NAME}-${V}-x86_64.AppImage
+
+`check-artifact.sh` unpacks the aarch64 AppImage on an x86 host through `qemu-aarch64`
+(qemu-user) or `unsquashfs` (squashfs-tools); with neither installed, its `binary` check fails.
 
 A failed run: `gh run view <id> --log-failed | tail -80`. Usual causes: a `-dev` package missing
 from `APPIMAGE_APT_EXTRA`/`DEB_APT_EXTRA`; a Makefile Cosmoe branch without the app's libraries;
@@ -117,10 +124,11 @@ log's "glibc needed" line.
     ### Install
     Haiku R1/beta6: `pkgman install ./<cmd>-<V>-1-x86_64.hpkg`
     VitruvianOS 0.6: `sudo apt install ./<cmd>_<V>-1_amd64.deb` (or `_arm64.deb` on ARM)
-    Linux (x86_64, glibc 2.39+): `chmod +x <App>-<V>-x86_64.AppImage && ./<App>-<V>-x86_64.AppImage`
+    Linux (glibc 2.39+): `chmod +x <App>-<V>-x86_64.AppImage && ./<App>-<V>-x86_64.AppImage` (`-aarch64` on ARM)
     ### Tested
     One line per platform: the OS and version from the evidence `os:` line, and what was
-    exercised. Then say plainly what was NOT tested (the arm64 .deb was not run, real hardware,
+    exercised. Then say plainly what was NOT tested (the arm64 .deb was not run; the aarch64
+    AppImage was only started in CI; Haiku has no arm64 build; real hardware,
     interactive Wayland, Renku OS, drag and drop from a Linux file manager…).
     ### Checksums
     See SHA256SUMS.
@@ -132,6 +140,7 @@ Keep the README's platform table in step with "Tested".
     git tag -a "v$V" -m "$APP_NAME $V" && git push origin "v$V"
     gh release create "v$V" $D/${APP_CMD}_${V}-${REVISION}_amd64.deb $D/${APP_CMD}_${V}-${REVISION}_arm64.deb \
     	$D/${APP_CMD}-${V}-${REVISION}-x86_64.hpkg $D/${APP_NAME}-${V}-x86_64.AppImage \
+    	$D/${APP_NAME}-${V}-aarch64.AppImage \
     	$D/SHA256SUMS --title "$APP_NAME $V" --notes-file $D/release-notes.md --verify-tag
 
 The tag starts both workflows again; each sees its file already attached and leaves it alone.
@@ -185,3 +194,9 @@ fails partway, don't delete or recreate anything: report the state and ask.
   screenshots and README changes before the final build.
 - An evidence script printed PASS lines unconditionally while the display it drove was dead.
   Make every PASS line depend on the check (see release-test.md).
+- The aarch64 X11 smoke test passed with an all-black screenshot: it only checked that the
+  process stayed up. The smoke scripts now fail on a one-colour screenshot and on a window
+  that never becomes visible. Look at every screenshot you cite.
+- On the slower arm64 runner, a window mapped while Openbox was still starting stayed unmapped.
+  Start the app only once the WM answers EWMH queries (`xdotool get_desktop`); `x11-smoke.sh`
+  does, and do the same when you start Xvfb + Openbox by hand.

@@ -2,11 +2,11 @@
 # wayland-smoke.sh — starts the AppImage on a headless Wayland compositor (Cosmoe's Wayland
 # backend), checks it stays up, and saves a screenshot, the app log and a protocol trace.
 #
-#   sh packaging/appimage/wayland-smoke.sh <App>-<version>-x86_64.AppImage [OUT_DIR]
+#   sh packaging/appimage/wayland-smoke.sh <App>-<version>-<arch>.AppImage [OUT_DIR]
 #
 # Uses sway on wlroots' headless backend, which always offers a wl_seat like a real desktop
 # (headless Weston has none, and Cosmoe exits without one), and grim for the screenshot.
-# Ubuntu: apt-get install --no-install-recommends sway grim. Generic beos-app-platforms template:
+# Ubuntu: apt-get install --no-install-recommends sway grim imagemagick. Generic beos-app-platforms template:
 # appimage.yml runs it after building the AppImage.
 set -u
 APP=$(readlink -f "$1")
@@ -45,6 +45,10 @@ grep -m3 -E 'wl_seat|xdg_toplevel@[0-9]+\.set_title' "$OUT/wayland-debug.log"
 WAYLAND_DISPLAY=$SOCK timeout 30 grim "$OUT/wayland-screenshot.png" || echo "wayland-smoke: screenshot failed"
 kill $PID 2>/dev/null; sleep 1; kill $COMP 2>/dev/null
 ls -l "$OUT"
+COLORS=$(identify -format %k "$OUT/wayland-screenshot.png" 2>/dev/null || echo unknown)
+if [ "$COLORS" = 1 ] || [ ! -s "$OUT/wayland-screenshot.png" ]; then
+	echo "wayland-smoke: the screenshot is missing or blank: the window drew nothing"; exit 1
+fi
 if grep -qiE 'error|assert|crash|segment|abort|exception' "$OUT/app.log"; then
 	echo "wayland-smoke: problems in the app log:"; grep -iE 'error|assert|crash|segment|abort|exception' "$OUT/app.log"
 	exit 1
