@@ -1,15 +1,15 @@
 ---
 name: beos-app-platforms
-description: Build, package, test and release BeOS-style apps (C++ against the Be/Haiku API) for Renku OS (the Haiku fork; .hpkg), VitruvianOS (a BeOS-like OS based on Linux; .deb) and plain Linux through the Cosmoe library (AppImage). Covers one source tree for all three, porting traps, Makefile platform detection, and a complete release pipeline: onboarding templates (packaging scripts, GitHub CI for the .debs and AppImage), building, testing every package in headless VirtualBox VMs (keyboard, mouse, screenshots, SSH) or under Xvfb, and a release gate that stops for a human before publishing. Use this whenever the task involves building, porting or packaging a Haiku-API app for any of these systems, cutting or verifying a release, booting or driving a test VM, checking that an app runs on Renku/VitruvianOS/Linux, or reporting a platform bug upstream, even if the user just says "test it on Renku", "make a release", "does it still work on V\OS", "port it to Linux" or "check the AppImage".
+description: Build, package, test and release BeOS-style apps (C++ against the Be/Haiku API) for Haiku R1/beta6 (.hpkg), VitruvianOS (a BeOS-like OS based on Linux; .deb) and plain Linux through the Cosmoe library (AppImage). Covers one source tree for all three, porting traps, Makefile platform detection, and a complete release pipeline: onboarding templates (packaging scripts, GitHub CI for the .debs and AppImage), building, testing every package in headless VirtualBox VMs (keyboard, mouse, screenshots, SSH) or under Xvfb, and a release gate that stops for a human before publishing. Use this whenever the task involves building, porting or packaging a Haiku-API app for any of these systems, cutting or verifying a release, booting or driving a test VM, checking that an app runs on Haiku/VitruvianOS/Linux, or reporting a platform bug upstream, even if the user just says "test it on Haiku", "make a release", "does it still work on V\OS", "port it to Linux" or "check the AppImage".
 ---
 
-# Building and testing BeOS-style apps on Renku OS, VitruvianOS and Linux (Cosmoe)
+# Building and testing BeOS-style apps on Haiku, VitruvianOS and Linux (Cosmoe)
 
 A BeOS-style app is C++ written against the Be/Haiku API (BApplication, BWindow, BView, the storage kit, node monitoring, attributes, Tracker). One source tree can ship on three platforms:
 
 | Platform | What it is | Package | Built where | Tested how |
 |---|---|---|---|---|
-| **Renku OS** | Fork of Haiku; still names its system package `haiku`, version `r1~beta6` | `.hpkg` (`package create`), x86_64 (arm64 blocked, see below) | Inside a Haiku R1/beta6 VM, over SSH (installs on Renku too) | VirtualBox VM: keyboard, mouse, screenshots |
+| **Haiku** | Haiku R1/beta6 (hrev59866) | `.hpkg` (`package create`), x86_64 (arm64 blocked, see below) | Inside a Haiku R1/beta6 VM, over SSH | VirtualBox VM: keyboard, mouse, screenshots |
 | **VitruvianOS** (V\OS) | A BeOS-like OS based on Linux (the Haiku API on a Debian userland) | `.deb` installing to `/system/apps`, **amd64 and arm64** | In CI, natively per architecture, with a link-time SDK | VirtualBox VM (UEFI; amd64 only) |
 | **Linux** | Any desktop, through the Cosmoe library (the Hokku fork) | AppImage, **x86_64 and aarch64** | **CI** (Ubuntu 24.04, natively per architecture) for releases; locally only for porting | Xvfb + Openbox (X11); in CI on both architectures, X11 and headless sway (Wayland) |
 
@@ -18,7 +18,7 @@ Read the reference file for what you're doing:
 - **Releasing** (any of "release X", "build X for all platforms", "set up X for packaging"): `references/release.md` first. It runs the phases and points to the rest:
   - `references/onboard.md`: set an app up once: `haiku-app.env`, the Makefile contract, copying `templates/`, the app's `release/test-plan.md`
   - `references/release-test.md`: test each artifact on its platform and write the evidence the gate reads; the two shared test VMs
-- `references/renku.md`: Renku OS (and Haiku-family guests in general): VM, SSH, building and checking an `.hpkg`, tests
+- `references/haiku.md`: Haiku R1/beta6: VM, SSH, building and checking an `.hpkg`, tests, arm64 status
 - `references/vitruvianos.md`: VitruvianOS: the SDK, `.deb` packaging (attributes need special handling), VM, tests
 - `references/cosmoe-linux.md`: Linux / Cosmoe: porting traps, the Makefile branch, AppImage bundling, CI, headless tests
 - `references/virtualbox.md`: driving any VM: scancodes, mouse via the VirtualBox SDK, screenshots, files in and out
@@ -40,12 +40,12 @@ Helper scripts in `scripts/` (read each script's header first):
 
 ## Rules that matter
 
-- **Never contact the Haiku project** (no Trac tickets, patches or forum posts), even for bugs that Renku or Cosmoe inherited from Haiku: the user says Haiku doesn't welcome AI contributions. Upstream reports go to **RenkuOS/Source** (AI-assisted work is explicitly allowed; keep write-ups short and plain); Cosmoe bugs are fixed in Hokku, never reported to haydentech/cosmoe (see below). File only after reproducing the bug in the platform's own code or bundled apps, not just in your app.
+- **Never contact the Haiku project** (no Trac tickets, patches or forum posts), even for bugs Cosmoe inherited from Haiku: the user says Haiku doesn't welcome AI contributions. Put platform bugs in your report to the user instead, after reproducing them in the platform's own code or bundled apps, not just in your app. Cosmoe bugs are fixed in Hokku, never reported to haydentech/cosmoe (see below).
 - **Build release packages in CI, not against the user's local libraries,** unless the user says otherwise (release.md § CI). The `.hpkg` is built in a Haiku R1/beta6 VM.
 - **Build for both amd64 (x86_64) and arm64 (aarch64) on all three platforms.** Every release ships both wherever the platform has an arm64 target:
   - **VitruvianOS:** one `deb.yml` job per architecture on `ubuntu-24.04` / `ubuntu-24.04-arm` in `debian:trixie`. The arm64 `.deb` gets static checks (VirtualBox can't run arm64 guests on x86).
   - **Linux:** one `appimage.yml` job per architecture on the same runners; each starts its AppImage under X11 and Wayland, so aarch64 runs on real arm64 hardware.
-  - **Haiku/Renku: arm64 is blocked** (Oct 2026): no R1/beta6 arm64 release, no arm64 package repository (so no `gcc`/`haiku_devel`), Renku ships no arm64 ISO, and `cross-platform-actions` has Haiku for x86-64 only. Check again at every release (renku.md § arm64); when a target appears, add the arm64 `.hpkg` and its test to the pipeline. Until then the release notes say Haiku is x86_64 only. Don't ship an untested cross-built `.hpkg`.
+  - **Haiku: arm64 is blocked** (Oct 2026): no R1/beta6 arm64 release, no arm64 package repository (so no `gcc`/`haiku_devel`), and `cross-platform-actions` has Haiku for x86-64 only. Check again at every release (haiku.md § arm64); when a target appears, add the arm64 `.hpkg` and its test to the pipeline. Until then the release notes say Haiku is x86_64 only. Don't ship an untested cross-built `.hpkg`.
 - **Linux builds use Hokku**, the user's Cosmoe fork (github.com/idumych/hokku): fix Cosmoe bugs there instead of working around them in apps, and never contribute upstream (cosmoe-linux.md).
 - **Linux means X11 and Wayland:** Cosmoe picks its backend from `WAYLAND_DISPLAY` / `COSMOE_BACKEND`; the AppImage bundles both, and `appimage.yml` smoke-tests it on headless sway (cosmoe-linux.md).
 - **Test the exact artifact you publish.** Build every package from one commit, test those files, publish them only after the release gate passes and a human says so, then re-test from the release URLs.
@@ -59,7 +59,7 @@ Helper scripts in `scripts/` (read each script's header first):
 
 A single Makefile can detect the platform. Check in this order and stop at the first match:
 
-1. `uname -s` is `Haiku`: Haiku/Renku. Link `-lbe -ltracker -ltranslation`, resources via `rc` and `xres`.
+1. `uname -s` is `Haiku`: Haiku. Link `-lbe -ltracker -ltranslation`, resources via `rc` and `xres`.
 2. `pkg-config --exists vos`, or `$(VOS_HEADERS)/os/BeBuild.h` exists: VitruvianOS (details in vitruvianos.md).
 3. `$(COSMOE_ROOT)/include/os/app/Application.h` exists: Cosmoe (details in cosmoe-linux.md).
 4. Otherwise print what's needed and fail. The portable unit tests should still build anywhere.
@@ -72,7 +72,7 @@ Keep `CXXFLAGS` additive (`override CXXFLAGS +=`) so packagers can pass hardenin
 
 ## Platform cheat sheet
 
-| | Renku OS / Haiku | VitruvianOS | Linux (Cosmoe) |
+| | Haiku | VitruvianOS | Linux (Cosmoe) |
 |---|---|---|---|
 | Command key | **Alt** | **Ctrl** | **Ctrl** |
 | Install | `pkgman install ./x.hpkg` | `sudo apt install ./x.deb` | AppImage: `chmod +x`, run |

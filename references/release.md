@@ -18,11 +18,11 @@ the X Y to click. Either way, take a fresh screenshot before every click.
 
 | Artifact | File in `dist/V/` | Built where |
 |---|---|---|
-| Haiku R1/beta6 (installs on Renku too) | `<APP_CMD>-<V>-<REVISION>-x86_64.hpkg` | inside the `haiku-b6-test` VM |
+| Haiku R1/beta6 | `<APP_CMD>-<V>-<REVISION>-x86_64.hpkg` | inside the `haiku-b6-test` VM |
 | VitruvianOS | `<APP_CMD>_<V>-<REVISION>_amd64.deb`, `_arm64.deb` | GitHub Actions, `deb.yml` (debian:trixie, one job per arch) |
 | Linux | `<APP_NAME>-<V>-x86_64.AppImage`, `-aarch64.AppImage` | GitHub Actions, `appimage.yml` (Ubuntu 24.04, Hokku, one job per arch; each starts its AppImage under X11 and Wayland) |
 
-Both architectures on every platform that has an arm64 target (SKILL.md rules). Haiku arm64 is blocked for now (renku.md § arm64): check at each release.
+Both architectures on every platform that has an arm64 target (SKILL.md rules). Haiku arm64 is blocked for now (haiku.md § arm64): check at each release.
 
 ## Starting cold
 
@@ -48,7 +48,7 @@ Every session starts with:
    exists on the host: `( . <sdk>/env.sh && make clean && make )`, then delete the result.
 3. **VMs:** `haiku-b6-test` and `vos-test` answer over SSH (release-test.md § Test VMs).
 4. **Push and CI** for HEAD (§ CI below). Build the .hpkg meanwhile.
-5. **README screenshots** from this release candidate: one per platform (Haiku/Renku,
+5. **README screenshots** from this release candidate: one per platform (Haiku,
    VitruvianOS, Linux; the CI Wayland smoke shot counts for Linux), each showing a real feature
    with real content, cropped to the window (`magick shot.png -crop WxH+X+Y +repage`), pointer
    and tooltips out of the way. Save as `docs/screenshots/<platform>-<what>.png` and show them in
@@ -79,7 +79,7 @@ Every session starts with:
   (`ssh haiku-b6-test grep -rn <Symbol> /boot/system/develop/headers/os`), not your memory.
 - `package create` complaining about a licence: `LICENSE_NAME` isn't a file in
   `/boot/system/data/licenses`.
-- No VM of your own? renku.md § Build an hpkg in GitHub CI. The gate still wants the test on
+- No VM of your own? haiku.md § Build an hpkg in GitHub CI. The gate still wants the test on
   Haiku R1/beta6.
 
 ## CI: the .debs and the AppImage
@@ -130,7 +130,7 @@ log's "glibc needed" line.
     One line per platform: the OS and version from the evidence `os:` line, and what was
     exercised. Then say plainly what was NOT tested (the arm64 .deb was not run; the aarch64
     AppImage was only started in CI; Haiku has no arm64 build; real hardware,
-    interactive Wayland, Renku OS, drag and drop from a Linux file manager…).
+    interactive Wayland, drag and drop from a Linux file manager…).
     ### Checksums
     See SHA256SUMS.
 

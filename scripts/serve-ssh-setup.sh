@@ -1,6 +1,6 @@
 #!/bin/sh
 # serve-ssh-setup.sh PUBKEY_FILE [PORT]  one-time SSH setup for a
-# Haiku-family guest (Renku OS, Haiku). Ask the user first: it installs a
+# Haiku guest. Ask the user first: it installs a
 # key and leaves sshd enabled at boot.
 #
 # Writes setup.sh to a temp dir and serves it on the host's LAN IP (VirtualBox

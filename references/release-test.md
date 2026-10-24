@@ -84,7 +84,7 @@ first boot**, since source VMs usually forward 2222:
 
 Without one: `sh $P/make-vm.sh haiku-b6-test ~/Downloads/haiku-r1beta6-x86_64-anyboot.iso` or
 `sh $P/make-vm.sh vos-test ~/Downloads/vitruvian-0.6.2-amd64.raw efi`, add the port forward
-(powered off), set up SSH (Haiku: renku.md § SSH; V\OS: vitruvianos.md § SSH), and on Haiku
+(powered off), set up SSH (Haiku: haiku.md § SSH; V\OS: vitruvianos.md § SSH), and on Haiku
 `ssh haiku-b6-test pkgman install -y gcc make haiku_devel`. SSH aliases in `~/.ssh/config`:
 `HostName 127.0.0.1`, the port, the user, `IdentityFile <key>`, `IdentitiesOnly yes`,
 `StrictHostKeyChecking accept-new`, `UserKnownHostsFile ~/.ssh/known_hosts_testvms`.
