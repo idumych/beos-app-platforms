@@ -15,7 +15,7 @@
 # Steps:
 #   start            (re)launch the app; its output goes to $SCRATCH/app.log
 #   c:x,y  r:x,y     left / right click, button held 150 ms (zero-length
-#                    clicks wedge Cosmoe windows: cosmoe#5)
+#                    clicks froze upstream Cosmoe windows; fixed in Kireji)
 #   cc:x,y ac:x,y    ctrl- / alt-click
 #   d:x1,y1,x2,y2    drag
 #   k:<keys>         xdotool key names, e.g. k:ctrl+r k:Return

@@ -32,7 +32,7 @@ Helper scripts in `scripts/` (read each script's header first):
 
 ## Rules that matter
 
-- **Never contact the Haiku project** (no Trac tickets, patches or forum posts), even for bugs that Renku or Cosmoe inherited from Haiku: the user says Haiku doesn't welcome AI contributions. Upstream reports go to **RenkuOS/Source** (AI-assisted work is explicitly allowed; keep write-ups short and plain) and **haydentech/cosmoe**. File only after reproducing the bug in the platform's own code or bundled apps, not just in your app.
+- **Never contact the Haiku project** (no Trac tickets, patches or forum posts), even for bugs that Renku or Cosmoe inherited from Haiku: the user says Haiku doesn't welcome AI contributions. Upstream reports go to **RenkuOS/Source** (AI-assisted work is explicitly allowed; keep write-ups short and plain); Cosmoe bugs are fixed in Kireji, never reported to haydentech/cosmoe (see below). File only after reproducing the bug in the platform's own code or bundled apps, not just in your app.
 - **Build release packages in CI, not against the user's local libraries,** unless the user says otherwise (V\OS `.deb`s: vitruvianos.md; AppImages: cosmoe-linux.md).
 - **Target amd64 and arm64 for VitruvianOS** by default: one `deb.yml` job per architecture on `ubuntu-24.04` / `ubuntu-24.04-arm` in `debian:trixie` (haiku-onboard's templates do this). arm64 gets static checks, since VirtualBox can't run arm64 guests on x86.
 - **Linux builds use Kireji**, the user's Cosmoe fork (github.com/idumych/kireji): fix Cosmoe bugs there instead of working around them in apps, and never contribute upstream (cosmoe-linux.md).

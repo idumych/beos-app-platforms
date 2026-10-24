@@ -18,14 +18,14 @@ Rows marked **Fixed in Kireji** need nothing in the app. The others are still op
 
 | Haiku behaviour your code may rely on | On Cosmoe | Do this |
 |---|---|---|
-| `watch_node(&node_ref, …)` | Stub, returns `B_NOT_SUPPORTED`; silently no messages (cosmoe#2) | Use `watch_path(absPath, flags, messenger)`, and re-watch folders after they move (path watches don't follow renames) |
-| Node-monitor `device`/`node` are int32/int64 | `B_DEVICE_TYPE`/`B_INODE_TYPE` fields (cosmoe#2) | Read them type-agnostically (`GetInfo` + `FindData`, take 4 or 8 bytes) |
-| Node-monitor `name` is a leaf | It's the **full path** (cosmoe#2) | If `name` starts with `/`, use it directly |
-| `entry_ref::name` is a leaf | **Full path** (cosmoe#6) | Use `BPath(&ref).Leaf()` or a basename. Set file-panel titles yourself, or they read `/path/to/App: Open` |
-| `B_UNDERSCORE_FACE`, `B_STRIKEOUT_FACE` | Not drawn, and they select a different (e.g. Light) style (cosmoe#3) | Leave them out on Cosmoe; use colour |
+| `watch_node(&node_ref, …)` | Upstream: stub, returns `B_NOT_SUPPORTED`; silently no messages | **Fixed in Kireji** (it finds a path for the node from an existing watch or an open `BNode`/`BEntry`). Either way, re-watch folders that move to another directory |
+| Node-monitor `device`/`node` are int32/int64 | Upstream: `B_DEVICE_TYPE`/`B_INODE_TYPE` fields | **Fixed in Kireji** (int32/int64, and `FindInt32()`/`FindDevice()` etc. accept either) |
+| Node-monitor `name` is a leaf | It's the **full path** | If `name` starts with `/`, use it directly |
+| `entry_ref::name` is a leaf | **Full path** (by design: Linux can't find a directory from its node) | Use `BPath(&ref).Leaf()` or `BEntry::GetName()`. Kireji's file panels, Save panel and Open With already show the leaf |
+| `B_UNDERSCORE_FACE`, `B_STRIKEOUT_FACE` | Upstream: not drawn, and they select a different (e.g. Light) style | **Fixed in Kireji** (drawn, at the right weight) |
 | `be_roster->Launch(&ref)` for folders, files, URLs | Not the Linux desktop | `posix_spawnp("xdg-open", …)` and `waitpid` |
-| Zero-length clicks | Stop all input to the window for good (cosmoe#5) | Nothing to fix in the app; hold clicks for 150 ms in tests |
-| Image translators on a first run from a mounted AppImage | None load, so `GetBitmapFile()` returns NULL all session (cosmoe#4) | Have AppRun set `TRANSLATORS=<bundle>/usr/lib/addons/Translators` (a single path: `AddPaths()` drops a character from all but the last entry) |
+| Zero-length clicks | Upstream: freeze the window for good (a `BMessageRunner` deadlock hit by `BTextView`) | **Fixed in Kireji**. `xtest.sh` still holds clicks for 150 ms |
+| Image translators on a first run from a mounted AppImage | With Cosmoe v0.9.0 none loaded, so `GetBitmapFile()` returned NULL all session. Not reproduced since, with Kireji or v0.9.0 | Keep AppRun setting `TRANSLATORS=<bundle>/usr/lib/addons/Translators`. Kireji fixed its colon-splitting off-by-one and prints the directories searched when none load |
 | Font faces: `SetFamilyAndFace(family, B_REGULAR_FACE / B_ITALIC_FACE)` | Upstream: every weight below Bold counted as regular, so Regular could come out Thin | **Fixed in Kireji** (Haiku's light/heavy/condensed faces; canonical style names win ties) |
 | `SetEventMask(B_POINTER_EVENTS)`, tooltips | Upstream: views in other windows never got pointer events, so tooltips never hid | **Fixed in Kireji** (pointer events delivered app-wide, as on Haiku) |
 | `find_directory` | Settings → `~/.config/cosmoe`; Trash → `~/.local/share/Trash/files`; `B_USER_DIRECTORY` → `$HOME`. Cosmoe also creates `~/cosmoe/` | Write `.trashinfo` records (the XDG layout matches V\OS's) |
@@ -68,7 +68,7 @@ ninja -C builddir && DESTDIR=<stage> meson install -C builddir --no-rebuild
 make COSMOE_ROOT=<stage>/usr && LD_LIBRARY_PATH=<stage>/usr/lib ./App
 ```
 
-- **Install with DESTDIR.** A plain `--prefix=$HOME/x` install fails, because Cosmoe hard-codes `/usr/share/wayland-sessions` (cosmoe#7).
+- **Installing.** Upstream Cosmoe hard-codes `/usr/share/wayland-sessions` (a plain `--prefix=$HOME/x` install fails) and its DESTDIR install deletes `libbe.so*` from the host's `/usr/local/lib`. Both are fixed in Kireji; DESTDIR installs work either way.
 - **Debug by default.** The default build is a debug build (`libbe` is 27 MB); use `--buildtype=release` for packaging.
 - **Arch prerequisites:** `meson` (plus optional `libicns`).
 - **Ubuntu prerequisites:** see the apt list in Folio's `.github/workflows/appimage.yml`.
@@ -79,7 +79,7 @@ Folio's `packaging/appimage/build-appimage.sh` (plus `AppRun`, `fonts.conf`, a `
 
 1. **Build Cosmoe** (release) into a stage. Build the app with `LDFLAGS=-s`; stripping is safe because `.cosmoe_rsrc` is an allocated section.
 2. **Assemble the AppDir:** `usr/bin/<App>`, then `libbe.so`, `libtracker.so` and both backend plugins in `usr/lib`. Add `usr/lib/addons/` (Translators, control_look), `usr/share/cosmoe/{mime_db,artwork,locale}`, the Noto fonts the app uses (Regular, Bold, Italic, BoldItalic, Mono), `etc/fonts/fonts.conf`, and the licences (yours plus Cosmoe's `License.md`).
-3. **Reset RUNPATHs before linuxdeploy:** `$ORIGIN` for `usr/lib/*.so`, `$ORIGIN/../..` for add-ons. Cosmoe bakes in `/usr/lib` and linuxdeploy only *appends*, so otherwise the host's ICU, pango and cairo win. linuxdeploy contains a `patchelf`: extract it with `--appimage-extract`.
+3. **Reset RUNPATHs before linuxdeploy:** `$ORIGIN` for `usr/lib/*.so`, `$ORIGIN/../..` for add-ons. Cosmoe v0.9.0 bakes in `/usr/lib` (newer Cosmoe and Kireji set no RUNPATH on Linux) and linuxdeploy only *appends*, so otherwise the host's ICU, pango and cairo win. linuxdeploy contains a `patchelf`: extract it with `--appimage-extract`.
 4. **Run linuxdeploy** with `--executable`, `--deploy-deps-only=` for every add-on and backend, `--desktop-file`, `--icon-file` and `--custom-apprun`. Set `NO_STRIP=1`: its bundled `strip` can't read `.relr.dyn` sections from newer distros.
 5. **AppRun:** set `FONTCONFIG_FILE` (a conf that `<include>`s `/etc/fonts/fonts.conf` and adds `<dir prefix="relative">../../usr/share/fonts</dir>`) and `TRANSLATORS`, then `exec` the binary.
 6. **Pack:** `appimagetool --no-appstream`. Pin both tools' release tags (e.g. linuxdeploy `1-alpha-20251107-1`, appimagetool `1.9.1`). Set `APPIMAGE_EXTRACT_AND_RUN=1` in CI, which has no FUSE.
@@ -110,6 +110,6 @@ APP=/path/App-x86_64.AppImage APP_NAME=App sh scripts/xtest.sh start shot:b    #
 - **Backtraces:** Yama blocks `gdb -p`, so launch under gdb: `gdb -batch -ex run -ex "thread apply all bt 20" --args ./App`, reproduce, then `pkill -INT -x App`.
 - **Library loading:** `LD_DEBUG=files` shows which libraries and add-ons load. `/proc/<pid>/maps` shows whether a library came from `/tmp/.mount_*` (bundled) or `/usr/lib` (host).
 - **Timing:** `LD_DEBUG` and gdb slow startup and can hide timing problems, so confirm without them.
-- **First run:** test both a **fresh HOME** and a reused one, and both the **mounted** and the extracted AppImage. cosmoe#4 only shows on a fresh HOME with the mounted image.
+- **First run:** test both a **fresh HOME** and a reused one, and both the **mounted** and the extracted AppImage. The v0.9.0 translator failure only showed on a fresh HOME with the mounted image.
 
 Wayland is testable headlessly with **sway** on wlroots' headless backend (`WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_LIBINPUT_NO_DEVICES=1 sway -c <conf>`) and `grim` for screenshots: haiku-onboard's `packaging/appimage/wayland-smoke.sh`, run by `appimage.yml`. Headless **Weston** doesn't work: it offers no `wl_seat`, and a Cosmoe app opens its window and then exits with status 127. Still not testable headlessly: drag-and-drop from a Linux file manager (XDND). Use a desktop Linux VM (see virtualbox.md) or ask the user to try on their own session.
