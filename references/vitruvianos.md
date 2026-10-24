@@ -46,6 +46,7 @@ A tray item (status icon) is a view that Deskbar loads from an add-on. On Linux,
 - `LoadAddOn()` **ignores** `AddIcon()`'s failure, so `BDeskbar::AddItem(&ref)` returns `B_OK` even when nothing appeared. Check the tray, and `journalctl -b | grep -i deskbar`.
 - **A failed add-on stays loaded** in Deskbar, and glibc hands back the cached image for the same path, so a fixed build isn't picked up until Deskbar restarts: `quit application/x-vnd.Be-TSKB`, then, because the session manager doesn't relaunch it, `setsid /system/Deskbar >/dev/null 2>&1 &`. Each failed attempt also adds the path to `~/config/settings/deskbar/replicants`; duplicates are skipped later.
 - There is no `desklink` on VitruvianOS; add the item from the app (`BDeskbar().AddItem(&ref)`, `HasItem(name)`, `RemoveItem(name)`).
+- **Upgrading the package removes the item** from the Deskbar (dpkg replaces the add-on file), and it stays gone after a Deskbar restart. So don't add it "once on first run": at every launch, add it unless the user removed it. Record a removal as a marker file in the app's settings folder, written both by the app's own toggle and by the item's "Remove from Deskbar" (the item runs in the Deskbar process, so it can't tell the app directly).
 - Give the item its own connection to whatever it monitors, so it works while the app is closed. Ask the app to act through `be_roster->Launch(signature, &message)`: it reaches a running app, or starts it with that message, which may arrive before `ReadyToRun()`, so queue it.
 - Draw with `AdoptParentColors()` in `AttachedToWindow()`, and use `SetToolTip()` for the status text.
 
@@ -82,6 +83,8 @@ After a reboot only the last line is needed: the live session keeps its files. T
 ## Test checklist
 
 The standard release checks (install, attributes, binary checksum, launch, log, quit) are in release-test.md. Also check `ls /tmp/*.rsrc`: it should not exist (see the rc trap above).
+
+To check which build is installed, hash a file the postinst doesn't touch (the Deskbar add-on, a data file) against the one in the release `.deb` (`ar x x.deb && tar -xf data.tar.*`). The app binary's hash changes on every install, because the postinst writes resources into it with `xres`.
 
 If attributes are missing, reproduce through dpkg itself: `sudo dpkg --unpack x.deb`, add `set -x; exec 2>>/tmp/pi.log` to `/var/lib/dpkg/info/<pkg>.postinst` (and change its `>/dev/null` to the log), then `sudo dpkg --configure <pkg>`. Manual runs from a shell can pass for unrelated reasons (cwd, file names you happened to choose).
 

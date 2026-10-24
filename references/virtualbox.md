@@ -65,7 +65,7 @@ Coordinates are screenshot pixels. The script holds the button about 80 ms and m
 2. **Published files:** `curl` the GitHub release URL from inside the guest. This is also the truest install test.
 3. **From the host:** run `python3 -m http.server PORT --bind <LAN-IP>` in a directory holding only what's needed, and stop it afterwards. Find the LAN IP with `ip route get 1.1.1.1 | grep -oP 'src \K\S+'`. **127.0.0.1 doesn't work:** VirtualBox 7 NAT blocks guest-to-host loopback (`10.0.2.2` gives connection refused). The host's ufw allows this, because NAT traffic comes from the host itself.
 4. **Tiny files without networking:** `echo <base64> | base64 -d | tar -xz` typed with `t:`.
-5. **Unreleased test builds when 3 is blocked** (auto mode may refuse a LAN server, or an ISO attached as a DVD, as "exposing local services"): tag a release candidate (`v1.2.3-rc1`) so the tag-triggered CI publishes it as a **prerelease**, which never becomes "Latest". Install it from the release URL like a real release, and delete the rc releases and tags once the final is out. `gh release delete <tag> --cleanup-tag` removes the local tag too, so don't `git tag -d` after it in an `&&` chain.
+5. **Unreleased test builds when 3 is blocked** (auto mode may refuse a LAN server, or an ISO attached as a DVD, as "exposing local services"): tag a release candidate (`v1.2.3-rc1`) so the tag-triggered CI publishes it as a **prerelease**, which never becomes "Latest". Install it from the release URL like a real release, and delete the rc releases and tags once the final is out. `gh release delete <tag> --cleanup-tag` removes the local tag too, so don't `git tag -d` after it in an `&&` chain. Auto mode blocks the delete as destructive unless the user has explicitly asked for it, so ask once the final is published.
 
 ## Driving the user's own VM
 
@@ -74,7 +74,10 @@ When the user asks you to test in a VM they're using:
 - **Their host mouse moves the guest pointer** whenever it passes over the VM window in the VirtualBox GUI, and **resizing that window changes the guest resolution**. Clicks then land in the wrong place (a click can become a drag). Re-check the resolution (`PIL.Image.open(shot).size`) and take a screenshot before every click; ask the user to keep the mouse off the window while you work.
 - **Windows stack.** A window hidden under another can't be clicked; raise it from its Deskbar entry first (click the app, then the window name in the list that opens).
 - **Escape may not close a pop-up menu** in a VitruvianOS app; click an empty spot on the desktop instead, then screenshot before the next step.
-- **Passwords:** run the command and stop at the `[sudo] password` prompt; the user types it. `sudo` stays cached for about 15 minutes.
+- **Passwords:** run the command and stop at the `[sudo] password` prompt; the user types it. `sudo` stays cached for about 15 minutes. The same goes for the OS login screen: leave it to the user, even when the password field is already filled.
+- **Focus moves without warning.** After an idle spell the first click may only wake the screen, and restarting Deskbar takes focus from the Terminal. Click the window you mean to type into and screenshot before typing, or the text lands in another app.
+- **Pop-up menus open with the checked item under the pointer**, so item positions change with the current choice. Screenshot each open menu before clicking an item.
+- **VPN apps:** the exit address is easy to check from the guest without exposing anything: `curl -s https://api.ivpn.net/v4/geo-lookup | grep -oE '"(isIvpnServer|city)":[^,]*'` (or the provider's equivalent).
 - **Put back what you changed** (settings, connections) and say so.
 
 ## Screenshots that must not show private data
@@ -85,6 +88,11 @@ When the user asks you to test in a VM they're using:
 2. Before the window's position is known, use `--panel-bottom PX`: it blacks out the bottom PX pixels of each window panel, and blacks out the whole image when it finds none.
 3. Once a redacted shot shows where the window sits, add `--fixed X0,Y0,X1,Y1` rectangles: over that area, and over a menu's private item before opening the menu. Be generous; a few lost pixels don't matter.
 4. Keep only the shots you need; delete the rest.
+
+## Audio and hangs
+
+- **Host audio can hang power-off.** With VirtualBox 7.2.22 and PipeWire 1.6.10 (CachyOS, kernel 7.3), a VM whose audio driver is "default" (ALSA) gets stuck in `Stopping` on Power off or Reset; the log ends at `Console::powerDown(): A request to power off the VM has been issued`. Guest-initiated shutdown still works. Use `--audio-driver pulse`, or `--audio-driver null` when the guest only needs a device to exist. Kill a stuck VM by its process ID; a host reboot waits on it too.
+- **Waiting for a guest:** the harness blocks chains of `sleep`. Poll screenshots in an `until` loop instead, e.g. until a pixel or the colour count says the desktop is up (`PIL.Image.open(shot).getcolors(1<<20)`).
 
 ## Hygiene
 

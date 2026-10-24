@@ -3,7 +3,7 @@
 Renku OS (github.com/RenkuOS/Source) is a fork of Haiku that started in September 2026. For packaging it's still Haiku:
 
 - **Package name and version.** The system package is still called `haiku`, with `HAIKU_VERSION = r1~beta6` (`build/jam/BuildSetup`). A package that `requires { haiku >= r1~beta6 }` installs on both Haiku R1/beta6 and Renku. A binary built on Haiku beta6 ran unchanged on Renku nightly build00055 (hrev60072+253).
-- **Nightlies:** `gh release view nightly -R RenkuOS/Source` (x86_64 and x86_gcc2h ISOs, each with a `.sha256`). Download into `~/Downloads` and check with `sha256sum -c`.
+- **Nightlies:** `gh release view nightly -R RenkuOS/Source` (x86_64 and x86_gcc2h ISOs, each with a `.sha256`). Download into `~/Downloads` and check with `sha256sum -c`. Some nights only the x86_gcc2h ISO is attached, so there may be no x86_64 image until a later build.
 - **Policy:** `AGENTS.md` in RenkuOS/Source, plus `RenkuOS/PlanAndGovernance` (CONTRIBUTING, REVIEW, DECISIONS). Machine-assisted work is allowed. Pull requests need a short human-style summary, a "How this was tested" section and a DCO `Signed-off-by`. Issues go to RenkuOS/Source. Renku has its own package repository ("Spritz Depot"); see its open issues for the submission process.
 
 ## arm64
@@ -29,6 +29,14 @@ The ISO is an *anyboot* hybrid image, so converted to VDI it boots as a writable
 - **Free space:** about 300 MB on the boot disk. Packages stay compressed, so `pkgman install gcc make` fits. `haiku_devel` was already installed on the Haiku beta6 image.
 - **Clock:** the VM clock runs in local time while the host assumes UTC, so tar and make warn "time stamp in the future". Fix with `find . -exec touch {} +`, or rely on `make clean`.
 - **Screen blanker:** if a screenshot is black, move the mouse (`m:move,…`) and take it again.
+
+### When it hangs on the boot splash
+
+Haiku R1/beta6 (hrev59866+79) hung with all splash icons lit on most boots in VirtualBox 7.2.22, whatever the disk controller, graphics, CPU count, audio or second disk. An older nightly (hrev59741) booted every time in the same VM. To see why:
+
+1. **Serial log:** with the VM off, `VBoxManage modifyvm <vm> --uart1 0x3F8 4 --uartmode1 file <path>`. The image doesn't log to serial by default: press Space repeatedly right after starting (`k:39,b9`) to get the boot menu, then **Select debug options → Enable serial debug output** → Return → **Continue booting**. The option lasts one boot.
+2. **Kernel debugger:** Alt+SysRq+D = `k:38,54,20,a0,d4,b8`. Type commands with `t:` and Enter; output goes to the serial log. Useful ones: `teams`, `threads <team>`, `bt <thread>`, `syslog | grep <word>`, `syslog | tail 30`.
+3. In that hang, `teams` showed no `app_server`, and `media_server` with a team ID in the tens of thousands (restarting in a loop inside `runtime_loader`).
 
 ## Get files in and out
 
