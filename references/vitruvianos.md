@@ -1,6 +1,6 @@
 # VitruvianOS (V\OS)
 
-V\OS runs the Haiku API on a Linux kernel, on a Debian trixie userland. Apps ship as `.deb` packages installing to `/system/apps`.
+VitruvianOS (V\OS) is a BeOS-like OS based on Linux: it runs the Haiku API on a Linux kernel, with a Debian trixie userland. Apps ship as `.deb` packages installing to `/system/apps`.
 
 ## Compile and link
 

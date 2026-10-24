@@ -1,4 +1,5 @@
-# @APP_NAME@ — builds on Haiku, VitruvianOS (V\OS) and Linux with Cosmoe
+# @APP_NAME@ — builds on Haiku, VitruvianOS (V\OS, a BeOS-like OS based on Linux) and Linux
+# with Cosmoe
 # from the same sources. Generic beos-app-platforms template: fill in SRCS, the extra
 # LIBS, and the test target; keep the platform branches as they are.
 #

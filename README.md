@@ -5,7 +5,7 @@ A [Claude Code](https://claude.com/claude-code) skill (also usable from opencode
 | Platform | Package | Tested in |
 |---|---|---|
 | [Renku OS](https://github.com/RenkuOS/Source) (Haiku fork), Haiku R1/beta6 | `.hpkg`, x86_64 (arm64 has no target yet), built in a Haiku R1/beta6 VM | VirtualBox VM |
-| [VitruvianOS](https://v-os.dev) (Haiku API on Linux) | `.deb` (amd64, arm64) | VirtualBox VM (amd64); static checks (arm64) |
+| [VitruvianOS](https://v-os.dev) (a BeOS-like OS based on Linux) | `.deb` (amd64, arm64) | VirtualBox VM (amd64); static checks (arm64) |
 | Linux, through [Hokku](https://github.com/idumych/hokku) (a fork of [Cosmoe](https://github.com/haydentech/cosmoe)) | AppImage, x86_64 and aarch64 (X11 and Wayland) | Xvfb + Openbox (X11); X11 and headless sway in CI on both architectures |
 
 It records what was learned shipping [Folio](https://github.com/idumych/folio) and [Sheath](https://github.com/idumych/sheath) on all three:

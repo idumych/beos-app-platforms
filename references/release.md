@@ -118,7 +118,8 @@ log's "glibc needed" line.
 ## Release notes (`dist/V/release-notes.md`)
 
     ## <App> <V>
-    <2–4 sentences: what the app is; what changed since the last release>
+    <2–4 sentences: what the app is; what changed since the last release. Introduce
+     VitruvianOS as "a BeOS-like OS based on Linux".>
     ### Downloads
     | Platform | File |              one row per artifact
     ### Install
