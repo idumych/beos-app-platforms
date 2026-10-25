@@ -83,10 +83,12 @@ appimage)
 		unsquashfs -q -d "$TMP/squashfs-root" -o "$OFF" "$TMP/a.AppImage" >/dev/null 2>&1
 	fi
 	R="$TMP/squashfs-root"
-	chk binary "test -s '$R/usr/bin/$APP_NAME'" "could not unpack it (for $AARCH on $(uname -m) install qemu-user or squashfs-tools), or usr/bin/$APP_NAME is missing"
-	chk "$AARCH binary" "[ \"\$(od -An -tx1 -j18 -N1 '$R/usr/bin/$APP_NAME' | tr -d ' ')\" = $EM ]" "usr/bin/$APP_NAME is not an $AARCH ELF"
-	chk rsrc-section "readelf -S '$R/usr/bin/$APP_NAME' | grep -q cosmoe_rsrc" "no .cosmoe_rsrc section (resources not linked in)"
-	chk signature "strings -a '$R/usr/bin/$APP_NAME' | grep -qF '$APP_SIG'"
+	# the executable is usr/bin/<App>, or usr/bin/<cmd> for apps whose binary is the command
+	BIN=$APP_NAME; [ -e "$R/usr/bin/$BIN" ] || BIN=$APP_CMD
+	chk binary "test -s '$R/usr/bin/$BIN'" "could not unpack it (for $AARCH on $(uname -m) install qemu-user or squashfs-tools), or usr/bin/$BIN is missing"
+	chk "$AARCH binary" "[ \"\$(od -An -tx1 -j18 -N1 '$R/usr/bin/$BIN' | tr -d ' ')\" = $EM ]" "usr/bin/$BIN is not an $AARCH ELF"
+	chk rsrc-section "readelf -S '$R/usr/bin/$BIN' | grep -q cosmoe_rsrc" "no .cosmoe_rsrc section (resources not linked in)"
+	chk signature "strings -a '$R/usr/bin/$BIN' | grep -qF '$APP_SIG'"
 	chk libbe "ls '$R'/usr/lib/libbe.so*"
 	chk libbe-runpath "readelf -d \$(ls '$R'/usr/lib/libbe.so* | head -1) | grep RUNPATH | grep -q '\[\$ORIGIN\]'" \
 		"libbe RUNPATH is not exactly \$ORIGIN (host libraries would win)"

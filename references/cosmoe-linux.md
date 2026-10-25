@@ -60,6 +60,11 @@ obj/App.rsrc.o: App.rdef
 
 Cosmoe's own `data/develop/makefile-engine` is the reference for flags. It also links cairo/pango, which a typical app doesn't need. The include root itself must be on the path (`<config/HaikuConfig.h>`, `<private/app/…>`).
 
+For an app whose build you don't control (autotools, a HaikuPorts port), add the compiled rdef to
+the finished executable instead: `objcopy --add-section .cosmoe_rsrc=App.rsrc
+--set-section-flags .cosmoe_rsrc=readonly,data <exe>`, after linuxdeploy (so nothing strips it).
+Cosmoe finds the section by its `RS` magic; it needn't be loaded.
+
 ## Build Hokku locally (porting and debugging)
 
 ```sh
