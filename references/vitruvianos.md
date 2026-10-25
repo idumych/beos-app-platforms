@@ -108,6 +108,13 @@ V\OS specifics (Ctrl+key = `k:1d,<code>,<code|80>,9d`):
 - **The SDK's libroot needs Nexus** ("Can't open Nexus IPC"): binaries built in the CI container
   can't run there. Do anything that must run the app (plugin caches, generated data) in
   `postinst` on the real system.
+- **BView calls from another thread abort the app** ("Looper must be locked", even
+  `Bounds()`), where Haiku lets reads through. Keep what a non-window thread needs (sizes)
+  in your own fields.
+- **OpenGL: `BGLView::GetGLProcAddress()` only knows extensions,** not `glBindTexture` and
+  other core functions; fall back to `dlsym` on `libOpenGL.so.0`/`libGL.so.1`. BGLView is in
+  `/system/lib/libopengl.so` (link `-lopengl`); the link-only SDK in VLC Reborn's
+  `tools/vos-sdk` keeps the `opengl` kit for it.
 - **Over SSH an app has no session environment**, so it can't reach the sound server
   (PipeWire refuses it). For tests, start it with the desktop's environment:
   `env $(tr '\0' '\n' < /proc/$(pgrep -f Deskbar | head -1)/environ | grep -E '^(XDG_|WAYLAND|DBUS)')`.

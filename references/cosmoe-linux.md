@@ -30,6 +30,8 @@ Rows marked **Fixed in Hokku** need nothing in the app. The others are still ope
 | `SetEventMask(B_POINTER_EVENTS)`, tooltips | Upstream: views in other windows never got pointer events, so tooltips never hid | **Fixed in Hokku** (pointer events delivered app-wide, as on Haiku) |
 | `find_directory` | Settings → `~/.config/cosmoe`; Trash → `~/.local/share/Trash/files`; `B_USER_DIRECTORY` → `$HOME`. Cosmoe also creates `~/cosmoe/` | Write `.trashinfo` records (the XDG layout matches V\OS's) |
 | Attributes | `user.*` xattrs (plus `user.COSMOE:ATTR_TYPES`); no queries | — |
+| `BMenuField` pop-ups and context menus on Wayland | Upstream: `BMenu` fitted them into `BScreen::Frame()`, which on Wayland covers one output in mixed logical/physical units, so on a second monitor they opened off screen | **Fixed in Hokku** (the compositor places menus). `BScreen::Frame()` is still wrong with several monitors or fractional scaling: don't position windows from it on Wayland |
+| `BGLView` (OpenGL kit) | Upstream: none | **Added in Hokku** (`libopengl.so`, `<opengl/GLView.h>`, EGL off-screen, any thread). Build Hokku with `libegl-dev libgl-dev`; link `-lopengl`; bundle `libopengl.so` but not `libEGL`/`libGL` (the host's driver renders) |
 | Drawing from a thread that isn't the window's (e.g. a video thread calling `DrawBitmap` under `LockLooper`) | Not shown | Store the bitmap and `Invalidate()`; draw it in `Draw()` |
 
 When a trap is fixed in Hokku, remove the app's workaround and mark the row here.
@@ -59,6 +61,12 @@ obj/App.rsrc.o: App.rdef
 ```
 
 Cosmoe's own `data/develop/makefile-engine` is the reference for flags. It also links cairo/pango, which a typical app doesn't need. The include root itself must be on the path (`<config/HaikuConfig.h>`, `<private/app/…>`).
+
+Testing a locally patched Hokku inside an AppImage: copy the new `libbe.so`/backends into an
+extracted AppImage and give each `$ORIGIN` as RUNPATH (`patchelf --set-rpath '$ORIGIN'`), as
+CI does. Without it libbe can't `dlopen` its display backend ("Failed to load any backend")
+and the app opens no window; a run with no GUI (`--intf dummy`) won't show this. Repack with
+`appimagetool` so the user can run it.
 
 For an app whose build you don't control (autotools, a HaikuPorts port), add the compiled rdef to
 the finished executable instead: `objcopy --add-section .cosmoe_rsrc=App.rsrc
