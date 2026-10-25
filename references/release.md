@@ -1,4 +1,4 @@
-# Releasing an app on all three platforms
+# Releasing an app on both platforms
 
 The pipeline runs from files in the app's repo, so it needs no knowledge in your head: set the
 app up once (onboard.md), then build, test every package on its real platform, and stop at
@@ -7,7 +7,7 @@ the release gate. A human must say "publish" before anything is tagged or releas
 Tools, run from the app's project root:
 
     S=$HOME/.claude/skills/beos-app-platforms; P=$S/scripts; T=$S/templates
-    $P/check-artifact.sh deb|hpkg|appimage FILE      static package checks
+    $P/check-artifact.sh hpkg|appimage FILE          static package checks
     $P/release-gate.sh                               the final yes/no
     $P/ocr-find.sh SHOT.png [WORD|--text]            a screenshot as text + click positions
     VM=<vm> SCRATCH=<dir> sh $P/vm.sh …              keys, text, mouse, screenshots in a VM
@@ -19,7 +19,6 @@ the X Y to click. Either way, take a fresh screenshot before every click.
 | Artifact | File in `dist/V/` | Built where |
 |---|---|---|
 | Haiku R1/beta6 (installs on Renku too) | `<APP_CMD>-<V>-<REVISION>-x86_64.hpkg` | inside the `haiku-b6-test` VM |
-| VitruvianOS | `<APP_CMD>_<V>-<REVISION>_amd64.deb`, `_arm64.deb` | GitHub Actions, `deb.yml` (debian:trixie, one job per arch) |
 | Linux | `<APP_NAME>-<V>-x86_64.AppImage`, `-aarch64.AppImage` | GitHub Actions, `appimage.yml` (Ubuntu 24.04, Hokku, one job per arch; each starts its AppImage under X11 and Wayland) |
 
 Both architectures on every platform that has an arm64 target (SKILL.md rules). Haiku arm64 is blocked for now (renku.md § arm64): check at each release.
@@ -44,22 +43,21 @@ Every session starts with:
 1. **Onboard** (onboard.md), once per app. Commit.
 2. **Host checks:** `[ -z "$TEST_CMD" ] || sh -c "$TEST_CMD"`, then `sh tools/haiku-typecheck.sh`
    (last line `typecheck: N files, PASS`; it checks against Haiku's *current* headers, so beta6
-   gaps like `AboutWindow.h` only show in the VM build). Optional V\OS link check if an SDK
-   exists on the host: `( . <sdk>/env.sh && make clean && make )`, then delete the result.
-3. **VMs:** `haiku-b6-test` and `vos-test` answer over SSH (release-test.md § Test VMs).
+   gaps like `AboutWindow.h` only show in the VM build).
+3. **VM:** `haiku-b6-test` answers over SSH (release-test.md § Test VM).
 4. **Push and CI** for HEAD (§ CI below). Build the .hpkg meanwhile.
 5. **README screenshots** from this release candidate: one per platform (Haiku/Renku,
-   VitruvianOS, Linux; the CI Wayland smoke shot counts for Linux), each showing a real feature
+   Linux; the CI Wayland smoke shot counts for Linux), each showing a real feature
    with real content, cropped to the window (`magick shot.png -crop WxH+X+Y +repage`), pointer
    and tooltips out of the way. Save as `docs/screenshots/<platform>-<what>.png` and show them in
    `README.md` under `## Screenshots`, one-line caption each. Commit **before** the final build:
-   the gate only accepts artifacts and evidence from HEAD, and wants 3+ screenshots.
-6. **Final build** of all three from that HEAD into `dist/V/`; `check-artifact.sh` on each.
-   Any fix means commit, push, and rebuild **all three**.
+   the gate only accepts artifacts and evidence from HEAD, and wants 2+ screenshots.
+6. **Final build** of both from that HEAD into `dist/V/`; `check-artifact.sh` on each.
+   Any fix means commit, push, and rebuild **both**.
 7. **Test** each artifact on its platform (release-test.md), producing `dist/V/evidence/`. A
    failure means fix the app, commit, push, back to 4.
 8. **Notes and sums:** `dist/V/release-notes.md` (below), then
-   `cd $D && sha256sum <amd64.deb> <arm64.deb> <hpkg> <x86_64.AppImage> <aarch64.AppImage> > SHA256SUMS`.
+   `cd $D && sha256sum <hpkg> <x86_64.AppImage> <aarch64.AppImage> > SHA256SUMS`.
 9. **Gate:** `$P/release-gate.sh`. Fix what it names. When it prints `GATE PASSED`, **stop**:
    report its output and wait for the human.
 10. **Publish** (only after the human says so; § Publish), then re-test from the release URLs.
@@ -82,54 +80,46 @@ Every session starts with:
 - No VM of your own? renku.md § Build an hpkg in GitHub CI. The gate still wants the test on
   Haiku R1/beta6.
 
-## CI: the .debs and the AppImage
+## CI: the AppImage
 
-Never build these on a rolling-release host (CachyOS: newer glibc, x86-64-v3 libraries; a
-host-built .deb once needed `cfsetispeed@GLIBC_2.42`, but V\OS has 2.41). Push, then:
+Never build it on a rolling-release host (CachyOS: newer glibc, x86-64-v3 libraries). Push, then:
 
     git push origin "$BRANCH"
-    gh workflow run appimage.yml --ref "$BRANCH"; gh workflow run deb.yml --ref "$BRANCH"
-    runid() { gh run list --workflow "$1" --branch "$BRANCH" --limit 5 --json databaseId,headSha,event \
-    	-q "[.[] | select(.headSha==\"$HEAD\" and .event==\"workflow_dispatch\")][0].databaseId"; }
-    for i in $(seq 30); do RUN=$(runid appimage.yml); DEB_RUN=$(runid deb.yml)
-    	[ -n "$RUN" ] && [ -n "$DEB_RUN" ] && break; sleep 5; done; echo "RUN=$RUN DEB_RUN=$DEB_RUN"
-    echo $RUN > $D/ci-run; echo $DEB_RUN > $D/deb-run
-    timeout 3600 gh run watch "$RUN" --exit-status; timeout 3600 gh run watch "$DEB_RUN" --exit-status
+    gh workflow run appimage.yml --ref "$BRANCH"
+    for i in $(seq 30); do RUN=$(gh run list --workflow appimage.yml --branch "$BRANCH" --limit 5 \
+    	--json databaseId,headSha,event \
+    	-q "[.[] | select(.headSha==\"$HEAD\" and .event==\"workflow_dispatch\")][0].databaseId")
+    	[ -n "$RUN" ] && break; sleep 5; done; echo "RUN=$RUN"
+    echo $RUN > $D/ci-run
+    timeout 3600 gh run watch "$RUN" --exit-status
 
-Run the watches in the background. First runs take 20–30 minutes (Hokku, the V\OS SDK), later
-ones come from the cache. When done:
+Run the watch in the background. A first run takes 20–30 minutes (Hokku), later ones come from
+the cache. When done:
 
     for a in x86_64 aarch64; do
     	gh run download "$RUN" -n AppImage-$a -D $D/; gh run download "$RUN" -n smoke-$a -D $D/smoke-$a
     	$P/check-artifact.sh appimage $D/${APP_NAME}-${V}-$a.AppImage
     done
-    gh run download "$DEB_RUN" -n deb-amd64 -D $D/; gh run download "$DEB_RUN" -n deb-arm64 -D $D/
-    for f in $D/*.deb; do $P/check-artifact.sh deb $f; done
 
 `check-artifact.sh` unpacks the aarch64 AppImage on an x86 host through `qemu-aarch64`
 (qemu-user) or `unsquashfs` (squashfs-tools); with neither installed, its `binary` check fails.
 
 A failed run: `gh run view <id> --log-failed | tail -80`. Usual causes: a `-dev` package missing
-from `APPIMAGE_APT_EXTRA`/`DEB_APT_EXTRA`; a Makefile Cosmoe branch without the app's libraries;
-a porting trap (cosmoe-linux.md); an SDK build error in `make-sdk.sh` (report it exactly: the
-script is a shared template). glibc > 2.41 on a CI .deb means a dependency is too new: read the
-log's "glibc needed" line.
+from `APPIMAGE_APT_EXTRA`; a Makefile Cosmoe branch without the app's libraries; a porting trap
+(cosmoe-linux.md).
 
 ## Release notes (`dist/V/release-notes.md`)
 
     ## <App> <V>
-    <2–4 sentences: what the app is; what changed since the last release. Introduce
-     VitruvianOS as "a BeOS-like OS based on Linux".>
+    <2–4 sentences: what the app is; what changed since the last release.>
     ### Downloads
     | Platform | File |              one row per artifact
     ### Install
     Haiku R1/beta6: `pkgman install ./<cmd>-<V>-1-x86_64.hpkg`
-    VitruvianOS 0.6: `sudo apt install ./<cmd>_<V>-1_amd64.deb` (or `_arm64.deb` on ARM)
     Linux (glibc 2.39+): `chmod +x <App>-<V>-x86_64.AppImage && ./<App>-<V>-x86_64.AppImage` (`-aarch64` on ARM)
     ### Tested
     One line per platform: the OS and version from the evidence `os:` line, and what was
-    exercised. Then say plainly what was NOT tested (the arm64 .deb was not run; the aarch64
-    AppImage was only started in CI; Haiku has no arm64 build; real hardware,
+    exercised. Then say plainly what was NOT tested (the aarch64 AppImage was only started in CI; Haiku has no arm64 build; real hardware,
     interactive Wayland, Renku OS, drag and drop from a Linux file manager…).
     ### Checksums
     See SHA256SUMS.
@@ -139,12 +129,11 @@ Keep the README's platform table in step with "Tested".
 ## Publish — only after the human said "publish"
 
     git tag -a "v$V" -m "$APP_NAME $V" && git push origin "v$V"
-    gh release create "v$V" $D/${APP_CMD}_${V}-${REVISION}_amd64.deb $D/${APP_CMD}_${V}-${REVISION}_arm64.deb \
-    	$D/${APP_CMD}-${V}-${REVISION}-x86_64.hpkg $D/${APP_NAME}-${V}-x86_64.AppImage \
+    gh release create "v$V" $D/${APP_CMD}-${V}-${REVISION}-x86_64.hpkg $D/${APP_NAME}-${V}-x86_64.AppImage \
     	$D/${APP_NAME}-${V}-aarch64.AppImage \
     	$D/SHA256SUMS --title "$APP_NAME $V" --notes-file $D/release-notes.md --verify-tag
 
-The tag starts both workflows again; each sees its file already attached and leaves it alone.
+The tag starts `appimage.yml` again; it sees its files already attached and leaves them alone.
 When they finish, check the release still holds exactly what you tested:
 
     mkdir -p $D/from-release && gh release download "v$V" -D $D/from-release --clobber
@@ -157,12 +146,12 @@ fails partway, don't delete or recreate anything: report the state and ask.
 ## Rules
 
 - **Allowed:** edit and commit in the app repo; push the current branch; build; drive
-  `haiku-b6-test` / `vos-test`; `gh workflow run`, `gh run list/view/watch/download`; write in
+  `haiku-b6-test`; `gh workflow run`, `gh run list/view/watch/download`; write in
   `dist/`, `obj/` and scratch dirs.
 - **Needs a human go-ahead:** `git tag`, pushing tags, any `gh release` command that changes
   something, force pushes, history rewrites, creating a GitHub repo, deleting a VM, touching
   any other VM (cloning *from* a powered-off one is allowed), installing host packages.
-- **Stage files by name.** Never `git add -A` / `git add .`: repos hold binaries, SDKs, `dist/`.
+- **Stage files by name.** Never `git add -A` / `git add .`: repos hold binaries, sysroots, `dist/`.
 - **Commit messages** end with the attribution your harness asks for (a local Qwen run:
   `Assisted-by: Qwen (local)`).
 - **A PASS is output you just saw.** Quote the command and the line it printed. A check you
@@ -185,9 +174,6 @@ fails partway, don't delete or recreate anything: report the state and ask.
 
 ## Mistakes seen
 
-- A .deb postinst moved the attribute placeholder, an **empty** file, over the binary: the app
-  was 0 bytes. The template postinst copies attributes with `getfattr | setfattr --restore`, and
-  `check-artifact.sh deb` catches the bad pattern.
 - A Makefile's Cosmoe branch linked only `-lbe -ltracker` and forgot the app's own libraries.
   Put them in `APP_LIBS` once, for all platforms.
 - A test VM already had an older version of the app installed. Remove it first.

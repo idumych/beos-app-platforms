@@ -14,18 +14,16 @@ set -u
 V=$VERSION
 D=dist/$V
 E=$D/evidence
-DEB=${APP_CMD}_${V}-${REVISION}_amd64.deb          # tested in the vos-test VM
-DEB_ARM64=${APP_CMD}_${V}-${REVISION}_arm64.deb    # static checks (no arm64 VM on x86 hosts)
 HPKG=${APP_CMD}-${V}-${REVISION}-x86_64.hpkg
 APPIMG=${APP_NAME}-${V}-x86_64.AppImage
 APPIMG_ARM64=${APP_NAME}-${V}-aarch64.AppImage  # started in CI on arm64 hardware (X11 + Wayland)
-PLATFORMS="haiku vos linux"
+PLATFORMS="haiku linux"
 REQUIRED="install attrs launch $FEATURE_CHECKS log-clean quit"
 pass=0 fail=0
 ok()  { echo "PASS $1"; pass=$((pass + 1)); }
 bad() { echo "FAIL $1: $2"; fail=$((fail + 1)); }
 field() { sed -n "s/^$2: *//p" "$1" 2>/dev/null | head -1; }
-art() { case $1 in haiku) echo $HPKG ;; vos) echo $DEB ;; linux) echo $APPIMG ;; esac; }
+art() { case $1 in haiku) echo $HPKG ;; linux) echo $APPIMG ;; esac; }
 
 HEAD=$(git rev-parse HEAD)
 if git diff --quiet HEAD -- 2>/dev/null; then ok tree-clean; else bad tree-clean "tracked files changed since HEAD; commit, push and rebuild"; fi
@@ -33,7 +31,6 @@ if git branch -r --contains "$HEAD" 2>/dev/null | grep -q origin/; then ok head-
 if git check-ignore -q "$D/x" 2>/dev/null; then ok dist-ignored; else bad dist-ignored "dist/ is not in .gitignore"; fi
 
 # version everywhere it lives
-if head -1 packaging/debian/changelog 2>/dev/null | grep -q "($V-$REVISION)"; then ok "version changelog"; else bad "version changelog" "top entry is not $V-$REVISION"; fi
 MA=$(echo "$V" | cut -d. -f1) MI=$(echo "$V" | cut -d. -f2) MN=$(echo "$V" | cut -d. -f3)
 if tr -d ' \t\n' < "$RDEF" | grep -q "major=$MA,middle=$MI,minor=$MN,"; then ok "version rdef"; else bad "version rdef" "$RDEF app_version is not $V"; fi
 if grep -qF "\"$APP_SIG\"" "$RDEF"; then ok "signature rdef"; else bad "signature rdef" "$RDEF app_signature is not $APP_SIG"; fi
@@ -43,8 +40,8 @@ shots=0
 for img in $(grep -oE '\]\(docs/screenshots/[^)]+\.(png|jpg)\)' README.md 2>/dev/null | sed 's/^](//; s/)$//'); do
 	[ -s "$img" ] && git ls-files --error-unmatch "$img" >/dev/null 2>&1 && shots=$((shots + 1))
 done
-[ $shots -ge 3 ] && ok "readme screenshots ($shots)" \
-	|| bad "readme screenshots" "README.md shows $shots committed docs/screenshots/ images; need one per platform (3+)"
+[ $shots -ge 2 ] && ok "readme screenshots ($shots)" \
+	|| bad "readme screenshots" "README.md shows $shots committed docs/screenshots/ images; need one per platform (2+)"
 
 for p in $PLATFORMS; do
 	a=$(art $p); f=$E/$p.txt
@@ -78,33 +75,13 @@ for p in $PLATFORMS; do
 done
 
 field "$E/haiku.txt" os | grep -q 'hrev59866' && ok "haiku os" || bad "haiku os" "os: line does not show Haiku R1/beta6 (hrev59866)"
-field "$E/vos.txt" os | grep -q '0\.6' && ok "vos os" || bad "vos os" "os: line does not show VitruvianOS 0.6.x"
 
-# the AppImage and the .deb must be CI builds of HEAD (appimage.yml / deb.yml)
-for pw in linux:appimage vos:deb; do     # workflow names (name: in appimage.yml / deb.yml)
-	p=${pw%%:*} wf=${pw#*:}
-	RUN=$(field "$E/$p.txt" ci-run)
-	got=$(gh run view "$RUN" --json headSha,conclusion,workflowName -q '.headSha+" "+.conclusion+" "+.workflowName' 2>/dev/null)
-	if [ -n "$RUN" ] && echo "$got" | grep -qx "$HEAD success $wf"; then
-		ok "$p from CI run $RUN ($wf)"
-	else bad "$p ci" "ci-run '$RUN' is not a successful $wf run of HEAD (got: $got)"; fi
-done
-
-# the arm64 .deb: VirtualBox can't run an arm64 guest here, so check it statically
-if [ -s "$D/$DEB_ARM64" ]; then
-	ok "vos-arm64 artifact"
-	T=$(mktemp -d)
-	dpkg-deb -x "$D/$DEB_ARM64" "$T" 2>/dev/null
-	[ "$(dpkg-deb -f "$D/$DEB_ARM64" Architecture 2>/dev/null)" = arm64 ] && ok "vos-arm64 architecture" \
-		|| bad "vos-arm64 architecture" "control file does not say arm64"
-	[ "$(dpkg-deb -f "$D/$DEB_ARM64" Version 2>/dev/null)" = "$V-$REVISION" ] && ok "vos-arm64 version" \
-		|| bad "vos-arm64 version" "control Version is not $V-$REVISION"
-	[ "$(od -An -tx1 -j18 -N1 "$T/system/apps/$APP_NAME" 2>/dev/null | tr -d ' ')" = b7 ] \
-		&& ok "vos-arm64 aarch64 binary" || bad "vos-arm64 aarch64 binary" "system/apps/$APP_NAME is not an aarch64 ELF"
-	rm -rf "$T"
-	grep -q " $DEB_ARM64\$" "$D/SHA256SUMS" 2>/dev/null && ok "vos-arm64 in SHA256SUMS" \
-		|| bad "vos-arm64 in SHA256SUMS" "$DEB_ARM64 is not listed"
-else bad "vos-arm64 artifact" "$D/$DEB_ARM64 missing (deb.yml builds amd64 and arm64)"; fi
+# the AppImage must be a CI build of HEAD (appimage.yml)
+RUN=$(field "$E/linux.txt" ci-run)
+got=$(gh run view "$RUN" --json headSha,conclusion,workflowName -q '.headSha+" "+.conclusion+" "+.workflowName' 2>/dev/null)
+if [ -n "$RUN" ] && echo "$got" | grep -qx "$HEAD success appimage"; then
+	ok "linux from CI run $RUN (appimage)"
+else bad "linux ci" "ci-run '$RUN' is not a successful appimage run of HEAD (got: $got)"; fi
 
 # the aarch64 AppImage: no arm64 desktop here, so appimage.yml starts it on GitHub's arm64
 # runner under X11 and Wayland; the evidence cites those smoke results
@@ -135,9 +112,9 @@ fi
 # the arm64 .hpkg (optional: only apps that need nothing from HaikuPorts; haiku-arm64.md),
 # tested on an arm64 nightly in QEMU
 HPKG_ARM64=${APP_CMD}-${V}-${REVISION}-arm64.hpkg
-N=5
+N=3
 if [ -s "$D/$HPKG_ARM64" ]; then
-	N=6; f=$E/haiku-arm64.txt
+	N=4; f=$E/haiku-arm64.txt
 	[ "$(field "$f" sha256)" = "$(sha256sum "$D/$HPKG_ARM64" | cut -d' ' -f1)" ] && ok "haiku-arm64 sha256" \
 		|| bad "haiku-arm64 sha256" "$f missing or for a different file than $D/$HPKG_ARM64"
 	[ "$(field "$f" commit)" = "$HEAD" ] && ok "haiku-arm64 commit" || bad "haiku-arm64 commit" "tested build is from '$(field "$f" commit)', HEAD is $HEAD"
@@ -149,7 +126,7 @@ fi
 
 if [ -s "$D/SHA256SUMS" ] && (cd "$D" && sha256sum -c --quiet SHA256SUMS) >/dev/null 2>&1 \
 	&& [ "$(grep -c . "$D/SHA256SUMS")" = $N ]; then ok SHA256SUMS
-else bad SHA256SUMS "$D/SHA256SUMS missing, wrong, or not exactly the $N artifacts (hpkg, 2 debs, 2 AppImages$( [ $N = 6 ] && echo ', arm64 hpkg'))"; fi
+else bad SHA256SUMS "$D/SHA256SUMS missing, wrong, or not exactly the $N artifacts (hpkg, 2 AppImages$( [ $N = 4 ] && echo ', arm64 hpkg'))"; fi
 
 echo
 if [ $fail = 0 ]; then

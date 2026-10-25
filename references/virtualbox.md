@@ -10,9 +10,8 @@ Run `VBoxManage list vms` and `list runningvms` before doing anything. Only driv
 |---|---|---|
 | `<app>-renku` | Renku nightly ISO | BIOS, 1024×768 |
 | `<app>-haiku` | Haiku R1/beta6 anyboot (+ a work disk) | SSH on 127.0.0.1:2222; gcc, make, haiku_devel; builds the hpkg |
-| `<app>-vos` | VitruvianOS raw image | UEFI, 1280×800, live user `vos-live` |
 
-Releases use two shared VMs, `haiku-b6-test` and `vos-test` (release-test.md § Test VMs). Keep the machine-specific list (names, SSH aliases, keys, what's installed) in project memory or notes, not in this skill.
+Releases use one shared VM, `haiku-b6-test` (release-test.md § Test VM). Keep the machine-specific list (names, SSH aliases, keys, what's installed) in project memory or notes, not in this skill.
 
 ## Create a VM
 
@@ -20,7 +19,7 @@ Releases use two shared VMs, `haiku-b6-test` and `vos-test` (release-test.md § 
 sh scripts/make-vm.sh NAME IMAGE [efi]
 ```
 
-It converts a copy of the ISO or raw image to VDI (`convertfromraw`; never edits the original), gives the VM 4 GB RAM, 4 CPUs, NAT, a USB tablet (for absolute mouse positions), no audio, and VBoxSVGA (VMSVGA for EFI), then boots it headless. Use `efi` for UEFI-only images (VitruvianOS). Haiku-family anyboot ISOs boot with BIOS.
+It converts a copy of the ISO or raw image to VDI (`convertfromraw`; never edits the original), gives the VM 4 GB RAM, 4 CPUs, NAT, a USB tablet (for absolute mouse positions), no audio, and VBoxSVGA (VMSVGA for EFI), then boots it headless. Use `efi` for UEFI-only images. Haiku-family anyboot ISOs boot with BIOS.
 
 ## Keyboard: `scripts/vm.sh`
 
@@ -73,7 +72,6 @@ When the user asks you to test in a VM they're using:
 
 - **Their host mouse moves the guest pointer** whenever it passes over the VM window in the VirtualBox GUI, and **resizing that window changes the guest resolution**. Clicks then land in the wrong place (a click can become a drag). Re-check the resolution (`PIL.Image.open(shot).size`) and take a screenshot before every click; ask the user to keep the mouse off the window while you work.
 - **Windows stack.** A window hidden under another can't be clicked; raise it from its Deskbar entry first (click the app, then the window name in the list that opens).
-- **Escape may not close a pop-up menu** in a VitruvianOS app; click an empty spot on the desktop instead, then screenshot before the next step.
 - **Passwords:** run the command and stop at the `[sudo] password` prompt; the user types it. `sudo` stays cached for about 15 minutes. The same goes for the OS login screen: leave it to the user, even when the password field is already filled.
 - **Focus moves without warning.** After an idle spell the first click may only wake the screen, and restarting Deskbar takes focus from the Terminal. Click the window you mean to type into and screenshot before typing, or the text lands in another app.
 - **Pop-up menus open with the checked item under the pointer**, so item positions change with the current choice. Screenshot each open menu before clicking an item.

@@ -7,17 +7,13 @@ testing need no knowledge in your head. Templates are in
 At the end the repo has:
 
     haiku-app.env                      identity, version, metadata, test evidence rules
-    Makefile                           the three-platform contract (below)
+    Makefile                           the two-platform contract (below)
     packaging/build-hpkg.sh            from the template, unchanged
-    packaging/build-deb.sh             from the template, unchanged
-    packaging/debian/postinst.in       from the template, unchanged
-    packaging/debian/changelog         first entry filled in
     packaging/description.txt          long description, plain text
     packaging/appimage/{build-appimage.sh,AppRun.in,fonts.conf}   unchanged
     packaging/appimage/icon.png        256x256 PNG
-    .github/workflows/{appimage.yml,deb.yml,test.yml}            unchanged
+    .github/workflows/{appimage.yml,test.yml}                    unchanged
     tools/haiku-typecheck.sh           unchanged
-    tools/vos-sdk/{make-sdk.sh,vos-0.6.2-linkonly.patch}         unchanged (deb.yml uses them)
     release/test-plan.md               how to exercise THIS app (below)
     .gitignore                         + the build outputs (below)
 
@@ -39,10 +35,10 @@ command that showed it:
    Never discard someone's changes.
 2. **Release history.** Run `git tag`, `gh release list`, `git log
    --oneline | head -20`, and look for stray release files (`SHA256SUMS`,
-   `*.hpkg`, `*.deb` in the tree).
+   `*.hpkg`, `*.AppImage` in the tree).
    - The version in the .rdef has never been published: release that version.
    - It has been published: bump it (patch level unless the human said
-     otherwise) and add a changelog entry.
+     otherwise).
    - Delete stale release files from git; release files live in `dist/`.
 3. **What the app is for, and what it needs from outside to do it.** Read
    the README and the main window's code. Then grep for the outside world:
@@ -65,8 +61,8 @@ Then read the rest:
   tests and `packaging/`.
 - List the libraries it links beyond the Haiku API (`grep -h '#include <'
   src -r | sort -u`, and LIBS in the Makefile): each one goes in
-  `APP_LIBS`, `HPKG_REQUIRES_EXTRA`, `DEB_DEPENDS_EXTRA`,
-  `APPIMAGE_MUST_BUNDLE` and `APPIMAGE_APT_EXTRA`.
+  `APP_LIBS`, `HPKG_REQUIRES_EXTRA`, `APPIMAGE_MUST_BUNDLE` and
+  `APPIMAGE_APT_EXTRA`.
 - Find platform `#ifdef`s (`__HAIKU__`, `*_COSMOE`) and look up
   cosmoe-linux.md § Porting traps for every Haiku API the app uses that's listed there.
 - If packaging already exists, compare it to the templates and say what
@@ -78,8 +74,7 @@ Then read the rest:
 `cp $T/haiku-app.env .` and fill in every field. Each one is commented.
 These must agree, and the gate checks them:
 - `APP_SIG` = `resource app_signature` in the .rdef
-- `VERSION` = the .rdef `app_version` (`major`/`middle`/`minor`) = the top
-  line of `packaging/debian/changelog`
+- `VERSION` = the .rdef `app_version` (`major`/`middle`/`minor`)
 - `APP_NAME` = the Makefile `NAME` = the binary's file name
 
 Haiku licence names must match a file in `/boot/system/data/licenses` on
@@ -93,13 +88,10 @@ If the app has no Makefile, start from `$T/Makefile` and fill in `SRCS`,
 `INCLUDES`, `APP_LIBS` and the `test` target. If it has one, make sure it
 meets this contract:
 
-1. `make` builds `./$APP_NAME` on Haiku, on V\OS (`pkg-config vos`, or
-   `/system/develop/headers`, or an SDK `env.sh` on the host), and with
-   Cosmoe (`COSMOE_ROOT=<prefix>`). Otherwise it prints what's missing and
-   fails.
-2. On Haiku and V\OS it compiles the .rdef to `obj/$APP_NAME.rsrc`, and
-   applies it with `xres` (plus `resattr` on V\OS, with absolute paths).
-   On Cosmoe it links it in as `.cosmoe_rsrc` (`obj/$APP_NAME.rsrc.o`).
+1. `make` builds `./$APP_NAME` on Haiku and with Cosmoe
+   (`COSMOE_ROOT=<prefix>`). Otherwise it prints what's missing and fails.
+2. On Haiku it compiles the .rdef to `obj/$APP_NAME.rsrc` and applies it
+   with `xres`. On Cosmoe it links it in as `.cosmoe_rsrc` (`obj/$APP_NAME.rsrc.o`).
 3. Flags are additive (`override CXXFLAGS +=`), so `CXXFLAGS=`/`LDFLAGS=`
    given on the command line add to the Makefile's own.
 4. The app's own libraries are linked on **every** platform branch.
@@ -110,32 +102,27 @@ meets this contract:
 
 Check it on the host: `make tests` or `$TEST_CMD`, then
 `sh tools/haiku-typecheck.sh` (it type-checks the UI sources against real
-Haiku headers), then a V\OS link (release.md, phase 2).
+Haiku headers).
 
 ## 4. Packaging and CI
 
-    mkdir -p packaging/debian packaging/appimage .github/workflows tools/vos-sdk release
-    cp $T/packaging/build-hpkg.sh $T/packaging/build-deb.sh packaging/
-    cp $T/packaging/debian/postinst.in packaging/debian/
+    mkdir -p packaging/appimage .github/workflows tools release
+    cp $T/packaging/build-hpkg.sh packaging/
     cp $T/packaging/appimage/* packaging/appimage/
     cp $T/.github/workflows/*.yml .github/workflows/
     cp $T/tools/haiku-typecheck.sh tools/
-    cp $T/tools/vos-sdk/* tools/vos-sdk/
 
 - **Old packaging scripts** at other paths: delete them with `git rm`, and
-  point the Makefile's `deb`/`hpkg` targets at the new ones.
-- **changelog:** fill in `$T/packaging/debian/changelog`. The date comes
-  from `date -R`, the name from `PACKAGER`.
+  point the Makefile's `hpkg` target at the new one.
 - **icon.png:** 256×256. If the app has none, draw a simple one with
   ImageMagick (`magick -size 256x256 xc:none -fill '#3b7dd8' -draw
   'roundrectangle 16,16 240,240 40,40' -fill white -pointsize 150 -gravity
   center -annotate 0 '<initial>' packaging/appimage/icon.png`) and say so in
   the report.
-- **.gitignore:** add `/<APP_NAME>`, `obj/`, `dist/`, `*.deb`, `*.hpkg`,
-  `*.AppImage`, `.cosmoe/`, `.haiku-headers/`, `.vos-sdk/`.
+- **.gitignore:** add `/<APP_NAME>`, `obj/`, `dist/`, `*.hpkg`,
+  `*.AppImage`, `.cosmoe/`, `.haiku-headers/`.
 - **Old CI** that builds release files some other way: replace it with the
-  templates. Release .debs and AppImages come only from `deb.yml` /
-  `appimage.yml`.
+  templates. Release AppImages come only from `appimage.yml`.
 
 ## 5. release/test-plan.md — how to use THIS app
 

@@ -4,7 +4,7 @@
 #
 # The image is copied (converted to VDI), never modified. Haiku-family
 # anyboot ISOs boot as a writable hard disk with BIOS; pass "efi" for
-# UEFI-only images such as VitruvianOS's raw disks.
+# UEFI-only images.
 set -eu
 NAME=$1
 IMAGE=$2
@@ -20,7 +20,7 @@ mkdir -p "$DIR"
 VBoxManage convertfromraw "$IMAGE" "$DIR/disk.vdi" --format VDI >/dev/null
 
 if [ "$FIRMWARE" = efi ]; then
-	OSTYPE=Debian_64; GFX=vmsvga
+	OSTYPE=Other_64; GFX=vmsvga
 else
 	OSTYPE=Other_64; GFX=vboxsvga
 fi

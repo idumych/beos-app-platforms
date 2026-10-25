@@ -1,12 +1,11 @@
 #!/bin/sh
-# check-artifact.sh deb|hpkg|appimage FILE [SSH_ALIAS]
+# check-artifact.sh hpkg|appimage FILE [SSH_ALIAS]
 #
 # Static checks on a built package, before any install test. Run from the
 # app's project root: names, version and signature come from haiku-app.env.
 # Prints one "PASS name" / "FAIL name: detail" line per check, then
 # "CHECKS PASSED n" or "CHECKS FAILED n of m". Exit status 1 on any failure.
 #
-#   deb       on the host (dpkg-deb, objdump)
 #   hpkg      needs a Haiku guest: SSH_ALIAS (default haiku-b6-test); the
 #             file is copied to /tmp there and read with Haiku's `package`
 #   appimage  on the host; extracts into a temp dir
@@ -26,31 +25,6 @@ trap 'rm -rf "$TMP"' EXIT
 [ -s "$FILE" ] || { echo "FAIL exists: $FILE missing or empty"; echo "CHECKS FAILED 1 of 1"; exit 1; }
 
 case "$KIND" in
-deb)
-	chk name "basename '$FILE' | grep -qxE '${APP_CMD}_${V}_(amd64|arm64).deb'" "file name is not ${APP_CMD}_${V}_amd64.deb or _arm64.deb"
-	I=$(dpkg-deb -I "$FILE")
-	chk version "echo \"\$I\" | grep -qx ' Version: $V'" "control Version is not $V"
-	chk depends-vos "echo \"\$I\" | grep -q 'Depends: vos (>= '" "no vos dependency"
-	dpkg-deb -x "$FILE" "$TMP/root"
-	dpkg-deb -e "$FILE" "$TMP/ctl"
-	B="$TMP/root/system/apps/$APP_NAME"
-	chk binary-nonempty "test -s '$B'" "/system/apps/$APP_NAME missing or empty"
-	chk binary-elf "head -c4 '$B' | grep -q ELF" "not an ELF file"
-	chk signature "strings -a '$B' | grep -qF '$APP_SIG'" "app signature resource missing (stripped after xres?)"
-	chk deskbar-link "test -L '$TMP/root/system/data/deskbar/menu/Applications/$APP_NAME'"
-	chk usr-bin-link "test -L '$TMP/root/usr/bin/$APP_CMD'"
-	chk attrs-tar "test -s '$TMP/root/usr/share/$APP_CMD/apps_attrs.tar'"
-	mkdir -p "$TMP/attrs"
-	chk attrs-has-sig "tar --xattrs --xattrs-include='user.*' -xf '$TMP/root/usr/share/$APP_CMD/apps_attrs.tar' -C '$TMP/attrs' && getfattr -d -m user.beos '$TMP/attrs/system/apps/$APP_NAME' | grep -q APP_SIG" \
-		"the attribute tarball has no user.beos.BEOS:APP_SIG"
-	# the tarball holds an EMPTY placeholder: postinst must copy attributes
-	# onto the real binary, never move or copy the file over it
-	chk postinst-keeps-binary "! grep -E '^[^#]*(mv|cp|install) .*/system/apps' '$TMP/ctl/postinst'" \
-		"postinst moves or copies a file into /system/apps (would replace the binary with the empty placeholder)"
-	chk postinst-sets-attrs "grep -q setfattr '$TMP/ctl/postinst'" "postinst never calls setfattr"
-	G=$(glibc_max "$B")
-	chk "glibc<=2.41 ($G)" "le '$G' GLIBC_2.41" "needs $G; VitruvianOS 0.6 (Debian trixie) has 2.41"
-	;;
 hpkg)
 	chk name "basename '$FILE' | grep -qxE '${APP_CMD}-${V}-(x86_64|arm64).hpkg'" "file name is not ${APP_CMD}-${V}-x86_64.hpkg or -arm64.hpkg"
 	case "$(basename "$FILE")" in *-arm64.hpkg) HARCH=arm64 ;; *) HARCH=x86_64 ;; esac
@@ -98,7 +72,7 @@ appimage)
 	G=$(glibc_max $(find "$R" -type f \( -name '*.so*' -o -path '*/usr/bin/*' \)))
 	chk "glibc<=2.39 ($G)" "le '$G' GLIBC_2.39" "needs $G; must run on Ubuntu 24.04 (2.39). Built on this host instead of CI?"
 	;;
-*) echo "usage: check-artifact.sh deb|hpkg|appimage FILE [SSH_ALIAS]" >&2; exit 2 ;;
+*) echo "usage: check-artifact.sh hpkg|appimage FILE [SSH_ALIAS]" >&2; exit 2 ;;
 esac
 
 if [ $fail = 0 ] && [ $pass -gt 0 ]; then echo "CHECKS PASSED $pass"; exit 0; fi
