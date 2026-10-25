@@ -68,10 +68,14 @@ jobs:
       - name: Smoke-test tools
         run: |
           sudo DEBIAN_FRONTEND=noninteractive timeout 300 apt-get install -y --no-install-recommends \
-            sway grim xvfb openbox imagemagick xdotool
+            sway grim xvfb openbox imagemagick xdotool pulseaudio
+          # A desktop has a sound server; without one an app that plays sound logs errors
+          pulseaudio --start --exit-idle-time=-1
 
       - name: X11 smoke test (Xvfb)
         timeout-minutes: 5
+        # env: SMOKE_WINDOW / SMOKE_PROCESS when the window title or process name doesn't
+        # start with the app's name (see x11-smoke.sh)
         run: sh packaging/appimage/x11-smoke.sh ${{ steps.app.outputs.file }} x11-smoke
 
       - name: Wayland smoke test (headless sway)

@@ -9,7 +9,7 @@ A BeOS-style app is C++ written against the Be/Haiku API (BApplication, BWindow,
 
 | Platform | What it is | Package | Built where | Tested how |
 |---|---|---|---|---|
-| **Renku OS** | Fork of Haiku; still names its system package `haiku`, version `r1~beta6` | `.hpkg` (`package create`), x86_64 (arm64 blocked, see below) | Inside a Haiku R1/beta6 VM, over SSH (installs on Renku too) | VirtualBox VM: keyboard, mouse, screenshots |
+| **Renku OS** | Fork of Haiku; still names its system package `haiku`, version `r1~beta6` | `.hpkg` (`package create`), x86_64; arm64 cross-built for apps needing only Haiku's own libraries | Inside a Haiku R1/beta6 VM, over SSH (installs on Renku too) | VirtualBox VM: keyboard, mouse, screenshots |
 | **VitruvianOS** (V\OS) | A BeOS-like OS based on Linux (the Haiku API on a Debian userland) | `.deb` installing to `/system/apps`, **amd64 and arm64** | In CI, natively per architecture, with a link-time SDK | VirtualBox VM (UEFI; amd64 only) |
 | **Linux** | Any desktop, through the Cosmoe library (the Hokku fork) | AppImage, **x86_64 and aarch64** | **CI** (Ubuntu 24.04, natively per architecture) for releases; locally only for porting | Xvfb + Openbox (X11); in CI on both architectures, X11 and headless sway (Wayland) |
 
@@ -18,6 +18,7 @@ Read the reference file for what you're doing:
 - **Releasing** (any of "release X", "build X for all platforms", "set up X for packaging"): `references/release.md` first. It runs the phases and points to the rest:
   - `references/onboard.md`: set an app up once: `haiku-app.env`, the Makefile contract, copying `templates/`, the app's `release/test-plan.md`
   - `references/release-test.md`: test each artifact on its platform and write the evidence the gate reads; the two shared test VMs
+- `references/haiku-arm64.md`: the arm64 `.hpkg`: cross toolchain and sysroot on Linux, the QEMU test machine, what can't be built yet
 - `references/renku.md`: Renku OS (and Haiku-family guests in general): VM, SSH, building and checking an `.hpkg`, tests
 - `references/vitruvianos.md`: VitruvianOS: the SDK, `.deb` packaging (attributes need special handling), VM, tests
 - `references/cosmoe-linux.md`: Linux / Cosmoe: porting traps, the Makefile branch, AppImage bundling, CI, headless tests
@@ -33,6 +34,7 @@ Helper scripts in `scripts/` (read each script's header first):
 - `serve-ssh-setup.sh`: one-time key-only SSH setup for a Haiku-family guest
 - `redactshot.py`: screenshot with private areas (account IDs, keys) blacked out before anything is written to disk
 - `ocr-find.sh SHOT [WORD|--text]`: a screenshot as text, with click positions
+- `haiku-arm64-vm.sh`: a Haiku arm64 nightly in QEMU (start, screenshots, pointer and keys over QMP, copy files in); `qmp-input.py` is its pointer helper
 - `check-artifact.sh deb|hpkg|appimage FILE`: static checks of a package
 - `release-gate.sh`: the final yes/no for a release, from raw evidence only
 
@@ -45,7 +47,7 @@ Helper scripts in `scripts/` (read each script's header first):
 - **Build for both amd64 (x86_64) and arm64 (aarch64) on all three platforms.** Every release ships both wherever the platform has an arm64 target:
   - **VitruvianOS:** one `deb.yml` job per architecture on `ubuntu-24.04` / `ubuntu-24.04-arm` in `debian:trixie`. The arm64 `.deb` gets static checks (VirtualBox can't run arm64 guests on x86).
   - **Linux:** one `appimage.yml` job per architecture on the same runners; each starts its AppImage under X11 and Wayland, so aarch64 runs on real arm64 hardware.
-  - **Haiku/Renku: arm64 is blocked** (Oct 2026): no R1/beta6 arm64 release, no arm64 package repository (so no `gcc`/`haiku_devel`), Renku ships no arm64 ISO, and `cross-platform-actions` has Haiku for x86-64 only. Check again at every release (renku.md § arm64); when a target appears, add the arm64 `.hpkg` and its test to the pipeline. Until then the release notes say Haiku is x86_64 only. Don't ship an untested cross-built `.hpkg`.
+  - **Haiku/Renku arm64:** Haiku's master arm64 repository has `haiku`/`haiku_devel`, but there is no R1/beta6 arm64 release, no HaikuPorts arm64 repository and no Renku arm64 ISO. So: an app that links **only Haiku's own libraries** (libbe, libtracker, libtranslation) is cross-built on Linux (`templates/tools/haiku-arm64/make-sysroot.sh`, `make HAIKU_CROSS=1`, `packaging/build-hpkg-arm64.sh`) and run on a nightly in QEMU before it ships (`references/haiku-arm64.md`). An app that needs HaikuPorts libraries (FFmpeg, sqlite, openssl…) has no arm64 `.hpkg` yet: the release notes say Haiku is x86_64 only. Check again at every release (renku.md § arm64).
 - **Linux builds use Hokku**, the user's Cosmoe fork (github.com/idumych/hokku): fix Cosmoe bugs there instead of working around them in apps, and never contribute upstream (cosmoe-linux.md).
 - **Linux means X11 and Wayland:** Cosmoe picks its backend from `WAYLAND_DISPLAY` / `COSMOE_BACKEND`; the AppImage bundles both, and `appimage.yml` smoke-tests it on headless sway (cosmoe-linux.md).
 - **Test the exact artifact you publish.** Build every package from one commit, test those files, publish them only after the release gate passes and a human says so, then re-test from the release URLs.

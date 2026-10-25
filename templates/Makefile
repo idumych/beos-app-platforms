@@ -11,7 +11,9 @@
 #   - `make` leaves the binary at ./$(NAME) and the compiled resources at
 #     obj/$(NAME).rsrc (V\OS, Haiku) or obj/$(NAME).rsrc.o (Cosmoe);
 #   - CXXFLAGS/LDFLAGS from the command line ADD to ours (override +=);
-#   - COSMOE_ROOT selects the Cosmoe install.
+#   - COSMOE_ROOT selects the Cosmoe install;
+#   - HAIKU_CROSS=1 (with tools/haiku-arm64's env.sh sourced) cross-compiles for
+#     Haiku arm64.
 
 NAME     := @APP_NAME@
 RDEF     := @RDEF@
@@ -31,7 +33,15 @@ APP_LIBS :=
 
 override CXXFLAGS += $(addprefix -I,$(INCLUDES))
 
-ifeq ($(UNAME),Haiku)
+ifneq ($(HAIKU_CROSS),)
+  # Haiku arm64, cross-compiled on Linux: . <work>/env.sh from
+  # tools/haiku-arm64/make-sysroot.sh, then make HAIKU_CROSS=1
+  PLATFORM     := Haiku
+  override CXXFLAGS += $(HAIKU_CROSS_CFLAGS)
+  override LDFLAGS  += $(HAIKU_CROSS_LDFLAGS)
+  LIBS         := -lbe -ltracker -ltranslation -lnetwork $(APP_LIBS)
+  RESOURCES     = rc -o obj/$(NAME).rsrc $(RDEF) && xres -o $@ obj/$(NAME).rsrc
+else ifeq ($(UNAME),Haiku)
   PLATFORM     := Haiku
   LIBS         := -lbe -ltracker -ltranslation -lnetwork $(APP_LIBS)
   INSTALL_DIR  := $(shell finddir B_USER_NONPACKAGED_DIRECTORY)/apps

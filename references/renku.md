@@ -8,13 +8,15 @@ Renku OS (github.com/RenkuOS/Source) is a fork of Haiku that started in Septembe
 
 ## arm64
 
-Blocked as of Oct 2026; check at every release, and build an arm64 `.hpkg` as soon as one of these turns up:
+Check at every release:
 
     curl -s -o /dev/null -w '%{http_code}\n' https://eu.hpkg.haiku-os.org/haiku/r1beta6/arm64/current/   # 404 = no arm64 R1/beta6 repo
+    curl -s -o /dev/null -w '%{http_code}\n' https://eu.hpkg.haiku-os.org/haikuports/master/arm64/current/ # 404 = no HaikuPorts arm64 repo
     gh release view nightly -R RenkuOS/Source --json assets -q '.assets[].name' | grep -i arm             # a Renku arm64 ISO?
-    curl -fsSL https://raw.githubusercontent.com/cross-platform-actions/action/master/readme.md | grep -A8 '(`haiku`)'   # Haiku arm64 in CI?
 
-Haiku's arm64 nightlies (`download.haiku-os.org/nightly-images/arm64/`) are experimental SD-card images with no package repository, and VirtualBox on an x86 host can't run arm64 guests; a QEMU `aarch64` VM would be the test machine. The `.hpkg` itself needs no changes beyond `getarch` reporting `arm64`.
+As of Oct 2026 only Haiku's own master arm64 repository exists, so apps that use nothing but
+Haiku's libraries are cross-built and tested in QEMU (haiku-arm64.md); apps needing HaikuPorts
+libraries wait for a HaikuPorts arm64 repository.
 
 ## Make a test VM
 
@@ -99,6 +101,11 @@ The pipeline builds it inside a Haiku R1/beta6 VM with `templates/packaging/buil
 - **Strip at link time** (`LDFLAGS=-s`): `xres` appends resources after the ELF data, so stripping afterwards removes them.
 - **Tree** relative to `/boot/system`: `apps/<App>`, `bin/<cmd>` → `../apps/<App>`, `data/deskbar/menu/Applications/<App>` → `../../../../apps/<App>`, `documentation/packages/<pkg>/`. Run `mimeset -f` on the binary; `package create` keeps attributes.
 - **`.PackageInfo`:** `provides { <pkg> = <v>  app:<App> = <v>  cmd:<cmd> }` takes no revision; `requires { haiku >= r1~beta6 }` lets it install on Renku too. `licenses` must name a file in `/boot/system/data/licenses`.
+- **Apps that are HaikuPorts ports** (VLC and other autotools apps with a recipe) are built
+  with `haikuporter` from the app's recipe instead. It reuses an old `work-*` directory and then
+  skips the patchset: delete it first. After killing a build, its chroot mounts stay: `unmount
+  work-*/dev` and `work-*/boot/system` before `rm -rf`. `haikuporter -C` (no chroot) doesn't
+  work on Haiku.
 - `finddir B_USER_NONPACKAGED_DIRECTORY` exists, but there's **no** `B_USER_NONPACKAGED_APPS_DIRECTORY` constant. For a `make install`, append `/apps` yourself.
 
 So far packages have been **built** on Haiku beta6 and **tested** on Renku. Building directly on Renku should work the same way, but check that its repositories provide `gcc`/`haiku_devel` first.

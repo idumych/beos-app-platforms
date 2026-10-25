@@ -98,3 +98,16 @@ V\OS specifics (Ctrl+key = `k:1d,<code>,<code|80>,9d`):
 - **Trash:** `find_directory(B_TRASH_DIRECTORY)` gives `~/config/data/Trash/files`. Write a freedesktop `.trashinfo` (URL-encoded `Path=`, `DeletionDate=`) into the sibling `info/`, and Tracker's Restore works. GNOME and KDE don't look there, though.
 - **No indexing or queries yet.** Attributes are still readable with `getfattr`.
 - **File panel quirk:** it shows "0 bytes" for every file. That's a V\OS display quirk, not your app.
+
+## Traps seen in 0.6.2
+
+- **`BWindow::Quit()` from another thread, and `wait_for_thread()`, can return before the
+  window's thread is gone.** A plugin or add-on unloaded right after (dlclose) crashes in that
+  thread. Keep a `BMessenger` to the window and wait until `IsValid()` is false; don't unload
+  code that windows run.
+- **The SDK's libroot needs Nexus** ("Can't open Nexus IPC"): binaries built in the CI container
+  can't run there. Do anything that must run the app (plugin caches, generated data) in
+  `postinst` on the real system.
+- **Over SSH an app has no session environment**, so it can't reach the sound server
+  (PipeWire refuses it). For tests, start it with the desktop's environment:
+  `env $(tr '\0' '\n' < /proc/$(pgrep -f Deskbar | head -1)/environ | grep -E '^(XDG_|WAYLAND|DBUS)')`.

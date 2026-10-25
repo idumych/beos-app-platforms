@@ -89,6 +89,11 @@ When the user asks you to test in a VM they're using:
 3. Once a redacted shot shows where the window sits, add `--fixed X0,Y0,X1,Y1` rectangles: over that area, and over a menu's private item before opening the menu. Be generous; a few lost pixels don't matter.
 4. Keep only the shots you need; delete the rest.
 
+- **Disk too small for the app?** Don't write your own partitioning tool: attach a bigger empty
+  disk, partition it with DriveSetup and install with the OS's own Installer.
+- **Haiku guests: use the Intel PRO/1000 NIC** (`--nictype1 82540EM`); the PCnet NIC stalls
+  during large downloads.
+
 ## Audio and hangs
 
 - **Host audio can hang power-off.** With VirtualBox 7.2.22 and PipeWire 1.6.10 (CachyOS, kernel 7.3), a VM whose audio driver is "default" (ALSA) gets stuck in `Stopping` on Power off or Reset; the log ends at `Console::powerDown(): A request to power off the VM has been issued`. Guest-initiated shutdown still works. Use `--audio-driver pulse`, or `--audio-driver null` when the guest only needs a device to exist. Kill a stuck VM by its process ID; a host reboot waits on it too.

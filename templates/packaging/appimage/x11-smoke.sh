@@ -4,6 +4,10 @@
 #
 #   sh packaging/appimage/x11-smoke.sh <App>-<version>-<arch>.AppImage [OUT_DIR]
 #
+# The app's window title and process name are taken to start with <App>; set SMOKE_WINDOW
+# (start of a window title) and SMOKE_PROCESS (process name) when they don't, e.g.
+# SMOKE_WINDOW="VideoLAN Client" SMOKE_PROCESS=vlc.
+#
 # Uses Xvfb with Openbox (without a window manager Cosmoe windows get no focus) and
 # ImageMagick's import for the screenshot. Ubuntu: apt-get install --no-install-recommends
 # xvfb openbox imagemagick xdotool. Generic beos-app-platforms template: appimage.yml runs it after
@@ -30,8 +34,10 @@ env -u WAYLAND_DISPLAY DISPLAY=$DPY COSMOE_BACKEND=x11 APPIMAGE_EXTRACT_AND_RUN=
 PID=$!
 # Wait for the app's top-level window (up to 60 s; first runs build font caches).
 APPNAME=$(basename "$APP" | sed 's/-[0-9].*//')
+WINDOW=${SMOKE_WINDOW:-$APPNAME}
+PROCESS=${SMOKE_PROCESS:-$APPNAME}
 for i in $(seq 60); do
-	DISPLAY=$DPY xdotool search --onlyvisible --name "^$APPNAME" >/dev/null 2>&1 && break
+	DISPLAY=$DPY xdotool search --onlyvisible --name "^$WINDOW" >/dev/null 2>&1 && break
 	kill -0 $PID 2>/dev/null || break
 	sleep 1
 done
@@ -50,12 +56,12 @@ echo "x11-smoke: the app is running under X11 ($(uname -m))"
 DISPLAY=$DPY timeout 30 import -window root "$OUT/x11-screenshot.png" || echo "x11-smoke: screenshot failed"
 # Stop the app before the X server, so its log doesn't end with "X connection broken".
 # $PID is the AppImage runtime; the app itself is its child, so stop that by name too.
-kill $PID 2>/dev/null; pkill -TERM -x "$APPNAME" 2>/dev/null
-for i in $(seq 20); do pgrep -x "$APPNAME" >/dev/null || break; sleep 0.25; done
-pkill -KILL -x "$APPNAME" 2>/dev/null; kill $WM $XPID 2>/dev/null
+kill $PID 2>/dev/null; pkill -TERM -x "$PROCESS" 2>/dev/null
+for i in $(seq 20); do pgrep -x "$PROCESS" >/dev/null || break; sleep 0.25; done
+pkill -KILL -x "$PROCESS" 2>/dev/null; kill $WM $XPID 2>/dev/null
 ls -l "$OUT"
-if ! sed -n '/^visible:/,/^all named:/p' "$OUT/window-tree.txt" | grep -q " $APPNAME"; then
-	echo "x11-smoke: no visible window named $APPNAME* appeared:"; cat "$OUT/window-tree.txt"; exit 1
+if ! sed -n '/^visible:/,/^all named:/p' "$OUT/window-tree.txt" | grep -q " $WINDOW"; then
+	echo "x11-smoke: no visible window named $WINDOW* appeared:"; cat "$OUT/window-tree.txt"; exit 1
 fi
 COLORS=$(identify -format %k "$OUT/x11-screenshot.png" 2>/dev/null || echo 0)
 if [ "${COLORS:-0}" -le 1 ]; then

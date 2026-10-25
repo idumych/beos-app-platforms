@@ -132,9 +132,24 @@ else
 	grep -q " $APPIMG_ARM64\$" "$D/SHA256SUMS" 2>/dev/null && ok "linux-arm64 in SHA256SUMS" || bad "linux-arm64 in SHA256SUMS" "$APPIMG_ARM64 is not listed"
 fi
 
+# the arm64 .hpkg (optional: only apps that need nothing from HaikuPorts; haiku-arm64.md),
+# tested on an arm64 nightly in QEMU
+HPKG_ARM64=${APP_CMD}-${V}-${REVISION}-arm64.hpkg
+N=5
+if [ -s "$D/$HPKG_ARM64" ]; then
+	N=6; f=$E/haiku-arm64.txt
+	[ "$(field "$f" sha256)" = "$(sha256sum "$D/$HPKG_ARM64" | cut -d' ' -f1)" ] && ok "haiku-arm64 sha256" \
+		|| bad "haiku-arm64 sha256" "$f missing or for a different file than $D/$HPKG_ARM64"
+	[ "$(field "$f" commit)" = "$HEAD" ] && ok "haiku-arm64 commit" || bad "haiku-arm64 commit" "tested build is from '$(field "$f" commit)', HEAD is $HEAD"
+	for c in install launch $FEATURE_CHECKS quit; do
+		grep -qE "^CHECK $c PASS" "$f" 2>/dev/null && ok "haiku-arm64 $c" || bad "haiku-arm64 $c" "no 'CHECK $c PASS' line in $f"
+	done
+	grep -qx 'RESULT: PASS' "$f" 2>/dev/null && ok "haiku-arm64 result" || bad "haiku-arm64 result" "no 'RESULT: PASS' line"
+fi
+
 if [ -s "$D/SHA256SUMS" ] && (cd "$D" && sha256sum -c --quiet SHA256SUMS) >/dev/null 2>&1 \
-	&& [ "$(grep -c . "$D/SHA256SUMS")" = 5 ]; then ok SHA256SUMS
-else bad SHA256SUMS "$D/SHA256SUMS missing, wrong, or not exactly the 5 artifacts (hpkg, 2 debs, 2 AppImages)"; fi
+	&& [ "$(grep -c . "$D/SHA256SUMS")" = $N ]; then ok SHA256SUMS
+else bad SHA256SUMS "$D/SHA256SUMS missing, wrong, or not exactly the $N artifacts (hpkg, 2 debs, 2 AppImages$( [ $N = 6 ] && echo ', arm64 hpkg'))"; fi
 
 echo
 if [ $fail = 0 ]; then

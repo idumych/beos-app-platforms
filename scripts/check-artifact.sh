@@ -52,12 +52,14 @@ deb)
 	chk "glibc<=2.41 ($G)" "le '$G' GLIBC_2.41" "needs $G; VitruvianOS 0.6 (Debian trixie) has 2.41"
 	;;
 hpkg)
-	chk name "basename '$FILE' | grep -qx '${APP_CMD}-${V}-x86_64.hpkg'" "file name is not ${APP_CMD}-${V}-x86_64.hpkg"
+	chk name "basename '$FILE' | grep -qxE '${APP_CMD}-${V}-(x86_64|arm64).hpkg'" "file name is not ${APP_CMD}-${V}-x86_64.hpkg or -arm64.hpkg"
+	case "$(basename "$FILE")" in *-arm64.hpkg) HARCH=arm64 ;; *) HARCH=x86_64 ;; esac
 	scp -q "$FILE" "$ALIAS:/tmp/check.hpkg" || { echo "FAIL scp to $ALIAS"; echo "CHECKS FAILED 1 of 1"; exit 1; }
 	# -i: meta information; -p: one path per line (bin/<cmd>...); -a: files with their attributes
 	ssh "$ALIAS" 'package list -i /tmp/check.hpkg; echo ===; package list -p /tmp/check.hpkg; echo ===; package list -a /tmp/check.hpkg; rm -f /tmp/check.hpkg' > "$TMP/list" 2>&1
 	L="$TMP/list"
 	chk version "grep -qE 'version:? *$V' '$L'" "PackageInfo version is not $V"
+	chk "architecture $HARCH" "grep -qE 'architecture:? *$HARCH' '$L'"
 	chk requires-beta6 "grep -qE 'haiku *>= *r1~beta6' '$L'" "does not require haiku >= r1~beta6"
 	chk apps-binary "grep -q 'apps/$APP_NAME' '$L'"
 	chk bin-link "grep -q 'bin/$APP_CMD' '$L'"

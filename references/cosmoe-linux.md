@@ -30,6 +30,7 @@ Rows marked **Fixed in Hokku** need nothing in the app. The others are still ope
 | `SetEventMask(B_POINTER_EVENTS)`, tooltips | Upstream: views in other windows never got pointer events, so tooltips never hid | **Fixed in Hokku** (pointer events delivered app-wide, as on Haiku) |
 | `find_directory` | Settings → `~/.config/cosmoe`; Trash → `~/.local/share/Trash/files`; `B_USER_DIRECTORY` → `$HOME`. Cosmoe also creates `~/cosmoe/` | Write `.trashinfo` records (the XDG layout matches V\OS's) |
 | Attributes | `user.*` xattrs (plus `user.COSMOE:ATTR_TYPES`); no queries | — |
+| Drawing from a thread that isn't the window's (e.g. a video thread calling `DrawBitmap` under `LockLooper`) | Not shown | Store the bitmap and `Invalidate()`; draw it in `Draw()` |
 
 When a trap is fixed in Hokku, remove the app's workaround and mark the row here.
 
