@@ -17,7 +17,7 @@ E=$D/evidence
 HPKG=${APP_CMD}-${V}-${REVISION}-x86_64.hpkg
 APPIMG=${APP_NAME}-${V}-x86_64.AppImage
 APPIMG_ARM64=${APP_NAME}-${V}-aarch64.AppImage  # started in CI on arm64 hardware (X11 + Wayland)
-PLATFORMS=${PLATFORMS:-haiku linux}   # haiku-app.env: "linux" for a Linux-only app
+PLATFORMS=${PLATFORMS:-haiku linux}   # haiku-app.env: "linux" or "haiku" for a one-platform app
 has() { case " $PLATFORMS " in *" $1 "*) return 0 ;; esac; return 1; }
 REQUIRED="install attrs launch $FEATURE_CHECKS log-clean quit"
 pass=0 fail=0
@@ -27,6 +27,11 @@ field() { sed -n "s/^$2: *//p" "$1" 2>/dev/null | head -1; }
 art() { case $1 in haiku) echo $HPKG ;; linux) echo $APPIMG ;; esac; }
 
 HEAD=$(git rev-parse HEAD)
+echo "platforms checked: $PLATFORMS"
+for p in $PLATFORMS; do
+	case $p in haiku|linux) ;; *) bad platforms "unknown platform '$p' in PLATFORMS (haiku, linux)" ;; esac
+done
+has haiku || has linux || bad platforms "PLATFORMS names no platform"
 if git diff --quiet HEAD -- 2>/dev/null; then ok tree-clean; else bad tree-clean "tracked files changed since HEAD; commit, push and rebuild"; fi
 if git branch -r --contains "$HEAD" 2>/dev/null | grep -q origin/; then ok head-pushed; else bad head-pushed "HEAD $HEAD is not on origin"; fi
 if git check-ignore -q "$D/x" 2>/dev/null; then ok dist-ignored; else bad dist-ignored "dist/ is not in .gitignore"; fi
@@ -80,6 +85,7 @@ if has haiku; then
 	field "$E/haiku.txt" os | grep -q 'hrev59866' && ok "haiku os" || bad "haiku os" "os: line does not show Haiku R1/beta6 (hrev59866)"
 fi
 
+if has linux; then
 # the AppImage must be a CI build of HEAD (appimage.yml)
 RUN=$(field "$E/linux.txt" ci-run)
 got=$(gh run view "$RUN" --json headSha,conclusion,workflowName -q '.headSha+" "+.conclusion+" "+.workflowName' 2>/dev/null)
@@ -112,14 +118,16 @@ else
 	done
 	grep -q " $APPIMG_ARM64\$" "$D/SHA256SUMS" 2>/dev/null && ok "linux-arm64 in SHA256SUMS" || bad "linux-arm64 in SHA256SUMS" "$APPIMG_ARM64 is not listed"
 fi
+fi	# has linux
 
 # the arm64 .hpkg (optional: only apps that need nothing from HaikuPorts; haiku-arm64.md),
 # tested on an arm64 nightly in QEMU
 HPKG_ARM64=${APP_CMD}-${V}-${REVISION}-arm64.hpkg
-N=2; WHAT="2 AppImages"
-has haiku && { N=3; WHAT="hpkg, 2 AppImages"; }
+N=0; WHAT=""
+has haiku && { N=$((N + 1)); WHAT="hpkg"; }
+has linux && { N=$((N + 2)); WHAT="${WHAT:+$WHAT, }2 AppImages"; }
 if has haiku && [ -s "$D/$HPKG_ARM64" ]; then
-	N=4; WHAT="$WHAT, arm64 hpkg"; f=$E/haiku-arm64.txt
+	N=$((N + 1)); WHAT="$WHAT, arm64 hpkg"; f=$E/haiku-arm64.txt
 	[ "$(field "$f" sha256)" = "$(sha256sum "$D/$HPKG_ARM64" | cut -d' ' -f1)" ] && ok "haiku-arm64 sha256" \
 		|| bad "haiku-arm64 sha256" "$f missing or for a different file than $D/$HPKG_ARM64"
 	[ "$(field "$f" commit)" = "$HEAD" ] && ok "haiku-arm64 commit" || bad "haiku-arm64 commit" "tested build is from '$(field "$f" commit)', HEAD is $HEAD"

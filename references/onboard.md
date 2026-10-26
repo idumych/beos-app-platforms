@@ -21,6 +21,14 @@ At the end the repo has:
 `haiku-app.env`. If a template can't handle the app, write down what is
 missing in your report. Don't fork the template.
 
+One exception: an app that ships several programs (a background service, a
+Deskbar add-on, helper binaries) keeps its own `packaging/build-hpkg.sh`,
+since the template packages a single binary. Its package must still pass
+`check-artifact.sh hpkg`: the file name `<APP_CMD>-<V>-<REVISION>-<arch>.hpkg`,
+the app at `APP_PATH` with its `BEOS:APP_SIG`, `bin/<APP_CMD>`, and the Deskbar
+entry `DESKBAR_NAME`. A Haiku-only app (`PLATFORMS="haiku"`, release.md) skips
+the AppImage files and `appimage.yml` below; `test.yml` still applies.
+
 ## 1. Read the app first
 
 Nobody will tell you anything about the app. Find out these things

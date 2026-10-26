@@ -17,6 +17,7 @@ Every platform gets the same standard checks, plus the app's own feature checks 
 ## Setup, every time
 
     . ./haiku-app.env; V=$VERSION; D=dist/$V; E=$D/evidence; S=$D/shots
+    APP_PATH=${APP_PATH:-apps/$APP_NAME}      # the installed app, from /boot/system
     mkdir -p $E $S; HEAD=$(git rev-parse HEAD); P=$HOME/.claude/skills/beos-app-platforms/scripts
     HOSTIP=$(ip route get 1.1.1.1 | grep -oP 'src \K\S+')   # how VMs reach host fixtures
 
@@ -100,13 +101,13 @@ Haiku starts sshd by itself (`uname -a` shows `hrev59866`).
     ssh haiku-b6-test "pkgman uninstall -y $APP_CMD" 2>&1 | tail -1    # "not installed" is fine
     scp $D/$F haiku-b6-test:/tmp/ && ssh haiku-b6-test "pkgman install -y /tmp/$F" 2>&1 | tail -3
     ssh haiku-b6-test "ls /boot/system/packages | grep '^$APP_CMD-'"   # install: must show $F
-    ssh haiku-b6-test "catattr BEOS:APP_SIG /boot/system/apps/$APP_NAME"   # attrs
+    ssh haiku-b6-test "catattr BEOS:APP_SIG /boot/system/$APP_PATH"   # attrs
     # fresh state: delete what the test plan names
-    ssh haiku-b6-test "(/boot/system/apps/$APP_NAME > /tmp/app.log 2>&1 &)"; sleep 5
+    ssh haiku-b6-test "(/boot/system/$APP_PATH > /tmp/app.log 2>&1 &)"; sleep 5
     VM=haiku-b6-test SCRATCH=$S sh $P/vm.sh shot:haiku-launch
     … feature steps …
     VM=haiku-b6-test sh $P/vm.sh k:38,10,90,b8                        # Alt+Q (click the window first)
-    ssh haiku-b6-test "ps | grep -v grep | grep -c '/apps/$APP_NAME'" # quit: 0 (count your own grep out)
+    ssh haiku-b6-test "ps | grep -v grep | grep -c '/$APP_PATH'"    # quit: 0 (count your own grep out)
     scp haiku-b6-test:/tmp/app.log $E/haiku-app.log
 
 A GUI app started over SSH appears on the Haiku desktop. If `pkgman` asks for confirmation

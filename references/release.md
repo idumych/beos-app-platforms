@@ -25,6 +25,13 @@ A Linux-only port (`PLATFORMS="linux"` in `haiku-app.env`) skips everything abou
 `.hpkg` and the Haiku VM: phases 3 and the hpkg half of 6 and 7, and the hpkg in
 `SHA256SUMS` and `gh release create`. The gate then checks the AppImages only.
 
+A Haiku-only app (`PLATFORMS="haiku"`) is the mirror image: no `appimage.yml`, no Cosmoe,
+no Linux half of phases 4, 6 and 7, and `SHA256SUMS` holds the `.hpkg` (and an arm64
+one, if built). Use it only when the app can't work on Linux at all, not when the port is
+just unfinished, and say why in the README and the release notes' "Tested" section (e.g.
+"Linux: not available; the app runs VPN tunnels through Haiku's own network stack").
+The gate prints the platforms it checked on its first line.
+
 Both architectures on every platform that has an arm64 target (SKILL.md rules). Haiku arm64 is blocked for now (renku.md § arm64): check at each release.
 
 ## Starting cold

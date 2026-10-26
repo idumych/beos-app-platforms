@@ -14,6 +14,8 @@ KIND=$1 FILE=$2 ALIAS=${3:-haiku-b6-test}
 [ -f haiku-app.env ] || { echo "check-artifact: run from the project root (no haiku-app.env)" >&2; exit 2; }
 . ./haiku-app.env
 V="$VERSION-$REVISION"
+APP_PATH=${APP_PATH:-apps/$APP_NAME}          # the app in the package, from /boot/system
+DESKBAR_NAME=${DESKBAR_NAME:-$APP_NAME}       # its Deskbar menu entry
 pass=0 fail=0
 ok()  { echo "PASS $1"; pass=$((pass + 1)); }
 bad() { echo "FAIL $1: $2"; fail=$((fail + 1)); }
@@ -32,13 +34,26 @@ hpkg)
 	# -i: meta information; -p: one path per line (bin/<cmd>...); -a: files with their attributes
 	ssh "$ALIAS" 'package list -i /tmp/check.hpkg; echo ===; package list -p /tmp/check.hpkg; echo ===; package list -a /tmp/check.hpkg; rm -f /tmp/check.hpkg' > "$TMP/list" 2>&1
 	L="$TMP/list"
+	# From `package list -a` (the third section, a tree indented two spaces per
+	# level, attributes as "<NAME ...>" under their file): APP_PATH's type and
+	# whether it carries BEOS:APP_SIG
+	awk -v want="$APP_PATH" '
+		/^===/ { sec++; next }
+		sec != 2 { next }
+		{ match($0, /^ */); depth = RLENGTH / 2; line = substr($0, RLENGTH + 1) }
+		line ~ /^</ { if (cur == want && line ~ /^<BEOS:APP_SIG /) sig = 1; next }
+		{ split(line, f, /  +/); name[depth] = f[1]; cur = name[0]
+		  for (i = 1; i <= depth; i++) cur = cur "/" name[i]
+		  if (cur == want) type = substr($NF, 1, 1) }
+		END { print (type == "-" ? "file" : type == "" ? "missing" : "not-a-file"), (sig ? "sig" : "nosig") }
+	' "$L" > "$TMP/app"
 	chk version "grep -qE 'version:? *$V' '$L'" "PackageInfo version is not $V"
 	chk "architecture $HARCH" "grep -qE 'architecture:? *$HARCH' '$L'"
 	chk requires-beta6 "grep -qE 'haiku *>= *r1~beta6' '$L'" "does not require haiku >= r1~beta6"
-	chk apps-binary "grep -q 'apps/$APP_NAME' '$L'"
+	chk apps-binary "grep -q '^file ' '$TMP/app'" "$APP_PATH is $(cut -d' ' -f1 "$TMP/app") in the package (APP_PATH)"
 	chk bin-link "grep -q 'bin/$APP_CMD' '$L'"
-	chk deskbar-link "grep -q 'deskbar/menu/Applications/$APP_NAME' '$L'"
-	chk app-sig-attr "grep -q 'BEOS:APP_SIG' '$L'" "no BEOS:APP_SIG attribute (rdef not compiled in, or mimeset missing)"
+	chk deskbar-link "grep -qF 'deskbar/menu/Applications/$DESKBAR_NAME' '$L'" "no Deskbar entry named '$DESKBAR_NAME' (DESKBAR_NAME)"
+	chk app-sig-attr "grep -q ' sig\$' '$TMP/app'" "$APP_PATH has no BEOS:APP_SIG attribute (rdef not compiled in, or mimeset missing)"
 	for r in ${HPKG_REQUIRES_EXTRA:-}; do chk "requires $r" "grep -qF '$r' '$L'"; done
 	;;
 appimage)

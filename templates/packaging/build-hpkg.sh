@@ -33,7 +33,8 @@ mkdir -p "$PKG/apps" "$PKG/bin" "$PKG/data/deskbar/menu/Applications" \
 cp "$APP_NAME" "$PKG/apps/$APP_NAME"
 mimeset -f "$PKG/apps/$APP_NAME"
 ln -s "../apps/$APP_NAME" "$PKG/bin/$APP_CMD"
-ln -s "../../../../apps/$APP_NAME" "$PKG/data/deskbar/menu/Applications/$APP_NAME"
+ln -s "../../../../apps/$APP_NAME" \
+	"$PKG/data/deskbar/menu/Applications/${DESKBAR_NAME:-$APP_NAME}"
 cp README.md LICENSE "$PKG/documentation/packages/$APP_CMD/" 2>/dev/null || :
 
 # 3. .PackageInfo
