@@ -41,8 +41,12 @@ if [ -z "${COSMOE_STAGE:-}" ]; then
 	if [ ! -f "$COSMOE_STAGE/usr/lib/libbe.so" ]; then
 		[ -d "$WORK/src" ] || git clone --depth 1 --branch "$COSMOE_TAG" \
 			"https://github.com/$COSMOE_REPO.git" "$WORK/src"
+		# Hokku's enable_apps=false leaves out its own apps and their catalogs:
+		# the AppImage needs only the libraries, add-ons and data.
+		NOAPPS=""
+		grep -q enable_apps "$WORK/src/meson_options.txt" 2>/dev/null && NOAPPS="-Denable_apps=false"
 		meson setup "$WORK/build" "$WORK/src" --prefix=/usr --libdir=lib \
-			--buildtype=release -Denable_unit_test_compile=false
+			--buildtype=release -Denable_unit_test_compile=false $NOAPPS
 		ninja -C "$WORK/build"
 		DESTDIR="$COSMOE_STAGE" meson install -C "$WORK/build" --no-rebuild
 	fi
@@ -62,12 +66,36 @@ rm -rf "$APPDIR"
 mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/lib" "$APPDIR/usr/share/cosmoe" \
 	"$APPDIR/usr/share/fonts/noto" "$APPDIR/etc/fonts" "$DOC"
 install -m 0755 "$APP_NAME" "$APPDIR/usr/bin/$APP_NAME"
-for lib in libbe.so libtracker.so libcosmoe-x11.so libcosmoe-wayland.so; do
+# Only what this app uses: libtracker if the binary links it, the image
+# translators haiku-app.env names (APPIMAGE_TRANSLATORS; unset = all of them),
+# and the catalogs of exactly those libraries and translators.
+LIBS="libbe.so libcosmoe-x11.so libcosmoe-wayland.so"
+CATALOGS="x-vnd.Haiku-libbe x-vnd.Haiku-libtextencoding"
+if readelf -d "$APP_NAME" | grep -q 'NEEDED.*\[libtracker\.so\]'; then
+	LIBS="$LIBS libtracker.so"
+	CATALOGS="$CATALOGS x-vnd.Haiku-libtracker"
+fi
+for lib in $LIBS; do
 	install -m 0755 "$CROOT/lib/$lib" "$APPDIR/usr/lib/$lib"
 done
-cp -a "$CROOT/lib/addons" "$APPDIR/usr/lib/"
-for d in mime_db artwork locale; do
+mkdir -p "$APPDIR/usr/lib/addons/Translators"
+cp -a "$CROOT/lib/addons/control_look" "$APPDIR/usr/lib/addons/"
+if [ -z "${APPIMAGE_TRANSLATORS+set}" ]; then
+	APPIMAGE_TRANSLATORS=$(cd "$CROOT/lib/addons/Translators" && ls *Translator.so | sed 's/Translator\.so$//')
+fi
+for t in $APPIMAGE_TRANSLATORS; do
+	[ -f "$CROOT/lib/addons/Translators/${t}Translator.so" ] \
+		|| { echo "build-appimage: no ${t}Translator.so in Cosmoe" >&2; exit 1; }
+	cp "$CROOT/lib/addons/Translators/${t}Translator.so" "$APPDIR/usr/lib/addons/Translators/"
+	CATALOGS="$CATALOGS x-vnd.Haiku-${t}Translator"
+done
+for d in mime_db artwork; do
 	cp -a "$CROOT/share/cosmoe/$d" "$APPDIR/usr/share/cosmoe/"
+done
+CATDIR="$APPDIR/usr/share/cosmoe/locale/catalogs"
+mkdir -p "$CATDIR"
+for c in $CATALOGS; do
+	[ ! -d "$CROOT/share/cosmoe/locale/catalogs/$c" ] || cp -a "$CROOT/share/cosmoe/locale/catalogs/$c" "$CATDIR/"
 done
 cp -a "$CROOT"/share/cosmoe/*.png "$APPDIR/usr/share/cosmoe/" 2>/dev/null || :
 for f in NotoSans-Regular NotoSans-Bold NotoSans-Italic NotoSans-BoldItalic \

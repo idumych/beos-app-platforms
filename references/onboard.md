@@ -63,6 +63,9 @@ Then read the rest:
   src -r | sort -u`, and LIBS in the Makefile): each one goes in
   `APP_LIBS`, `HPKG_REQUIRES_EXTRA`, `APPIMAGE_MUST_BUNDLE` and
   `APPIMAGE_APT_EXTRA`.
+- List the image formats it reads or writes through the Translation Kit
+  (`grep -rn 'BTranslationUtils\|BTranslatorRoster' src`): they go in
+  `APPIMAGE_TRANSLATORS`. None = `""`; PNG alone covers app artwork.
 - Find platform `#ifdef`s (`__HAIKU__`, `*_COSMOE`) and look up
   cosmoe-linux.md § Porting traps for every Haiku API the app uses that's listed there.
 - If packaging already exists, compare it to the templates and say what
