@@ -15,6 +15,11 @@
 # arm64 hardware too.
 set -u
 APP=$(readlink -f "$1")
+# Arguments for the app: SMOKE_ARGS from the environment, else from haiku-app.env in the
+# current directory (e.g. a local server address, so the app doesn't reach the internet).
+if [ -z "${SMOKE_ARGS+x}" ] && [ -f haiku-app.env ]; then
+	SMOKE_ARGS=$(. ./haiku-app.env; printf '%s' "${SMOKE_ARGS:-}")
+fi
 OUT=$(mkdir -p "${2:-x11-smoke}" && cd "${2:-x11-smoke}" && pwd)
 DPY=:77
 Xvfb $DPY -screen 0 1280x800x24 -nolisten tcp > "$OUT/xvfb.log" 2>&1 &
@@ -30,7 +35,7 @@ DISPLAY=$DPY xdotool get_desktop >/dev/null 2>&1 || { echo "x11-smoke: openbox d
 
 HOME_DIR=$(mktemp -d)
 env -u WAYLAND_DISPLAY DISPLAY=$DPY COSMOE_BACKEND=x11 APPIMAGE_EXTRACT_AND_RUN=1 \
-	HOME="$HOME_DIR" "$APP" > "$OUT/app.log" 2>&1 &
+	HOME="$HOME_DIR" "$APP" ${SMOKE_ARGS:-} > "$OUT/app.log" 2>&1 &
 PID=$!
 # Wait for the app's top-level window (up to 60 s; first runs build font caches).
 APPNAME=$(basename "$APP" | sed 's/-[0-9].*//')

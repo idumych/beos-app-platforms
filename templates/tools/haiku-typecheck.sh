@@ -3,7 +3,9 @@
 # Haiku's real system headers on a Linux host (g++ -fsyntax-only). Catches
 # wrong API names, signatures and types in seconds, before a VM build; it
 # does not link or run anything. Files and include dirs come from
-# TYPECHECK_SRCS / TYPECHECK_INCLUDES in haiku-app.env.
+# TYPECHECK_SRCS / TYPECHECK_INCLUDES in haiku-app.env, extra compiler flags
+# (the app's -D defines; -D__HAIKU__, which Haiku's compiler predefines) from
+# TYPECHECK_CXXFLAGS.
 #
 #   sh tools/haiku-typecheck.sh [CACHE_DIR]     (default: ./.haiku-headers)
 # Prints "ok  <file>" or the compiler errors; exit 1 on any error.
@@ -36,7 +38,9 @@ for d in ${TYPECHECK_INCLUDES:-}; do INC="$INC -I$ROOT/$d"; done
 status=0 n=0
 for f in $TYPECHECK_SRCS; do
 	n=$((n + 1))
+	# shellcheck disable=SC2086
 	out=$(g++ -std=c++17 -Wall -Wno-cpp -Wno-multichar -fsyntax-only $INC \
+		${TYPECHECK_CXXFLAGS:-} \
 		-include "$CACHE/shim.h" "$ROOT/$f" 2>&1 \
 		| grep -E "^[^ ].*: (error|warning): " | grep -v "^$H/" | grep -v "redefined" || true)
 	if [ -n "$out" ]; then echo "$out"; status=1; else echo "ok  $f"; fi

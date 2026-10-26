@@ -21,6 +21,10 @@ the X Y to click. Either way, take a fresh screenshot before every click.
 | Haiku R1/beta6 (installs on Renku too) | `<APP_CMD>-<V>-<REVISION>-x86_64.hpkg` | inside the `haiku-b6-test` VM |
 | Linux | `<APP_NAME>-<V>-x86_64.AppImage`, `-aarch64.AppImage` | GitHub Actions, `appimage.yml` (Ubuntu 24.04, Hokku, one job per arch; each starts its AppImage under X11 and Wayland) |
 
+A Linux-only port (`PLATFORMS="linux"` in `haiku-app.env`) skips everything about the
+`.hpkg` and the Haiku VM: phases 3 and the hpkg half of 6 and 7, and the hpkg in
+`SHA256SUMS` and `gh release create`. The gate then checks the AppImages only.
+
 Both architectures on every platform that has an arm64 target (SKILL.md rules). Haiku arm64 is blocked for now (renku.md § arm64): check at each release.
 
 ## Starting cold
@@ -93,7 +97,8 @@ Never build it on a rolling-release host (CachyOS: newer glibc, x86-64-v3 librar
     echo $RUN > $D/ci-run
     timeout 3600 gh run watch "$RUN" --exit-status
 
-Run the watch in the background. A first run takes 20–30 minutes (Hokku), later ones come from
+Run the watch in the background. Don't trust its exit status alone: it has returned 0 with the
+aarch64 job failed. Check every job: `gh run view "$RUN" --json jobs -q '.jobs[] | .name+" "+.conclusion'`. A first run takes 20–30 minutes (Hokku), later ones come from
 the cache. When done:
 
     for a in x86_64 aarch64; do

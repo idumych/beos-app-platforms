@@ -66,17 +66,21 @@ rm -rf "$APPDIR"
 mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/lib" "$APPDIR/usr/share/cosmoe" \
 	"$APPDIR/usr/share/fonts/noto" "$APPDIR/etc/fonts" "$DOC"
 install -m 0755 "$APP_NAME" "$APPDIR/usr/bin/$APP_NAME"
-# Only what this app uses: libtracker if the binary links it, the image
-# translators haiku-app.env names (APPIMAGE_TRANSLATORS; unset = all of them),
-# and the catalogs of exactly those libraries and translators.
+# Only what this app uses: the Cosmoe libraries the binary links (libtracker,
+# libbnetapi, libopengl...), the image translators haiku-app.env names
+# (APPIMAGE_TRANSLATORS; unset = all of them), and the catalogs of exactly those
+# libraries and translators.
 LIBS="libbe.so libcosmoe-x11.so libcosmoe-wayland.so"
 CATALOGS="x-vnd.Haiku-libbe x-vnd.Haiku-libtextencoding"
-if readelf -d "$APP_NAME" | grep -q 'NEEDED.*\[libtracker\.so\]'; then
-	LIBS="$LIBS libtracker.so"
-	CATALOGS="$CATALOGS x-vnd.Haiku-libtracker"
-fi
+for lib in $(readelf -d "$APP_NAME" | sed -n 's/.*NEEDED.*\[\(lib[^]]*\)\]/\1/p'); do
+	case " $LIBS " in *" $lib "*) continue ;; esac
+	[ -e "$CROOT/lib/$lib" ] || continue	# not Cosmoe's: linuxdeploy bundles it
+	LIBS="$LIBS $lib"
+	[ "$lib" != libtracker.so ] || CATALOGS="$CATALOGS x-vnd.Haiku-libtracker"
+done
 for lib in $LIBS; do
-	install -m 0755 "$CROOT/lib/$lib" "$APPDIR/usr/lib/$lib"
+	# under the name the binary asks for (e.g. libbnetapi.so.0), not a symlink
+	install -m 0755 "$(readlink -f "$CROOT/lib/$lib")" "$APPDIR/usr/lib/$lib"
 done
 mkdir -p "$APPDIR/usr/lib/addons/Translators"
 cp -a "$CROOT/lib/addons/control_look" "$APPDIR/usr/lib/addons/"
@@ -154,7 +158,9 @@ if [ ! -x "$LDROOT/AppRun" ]; then
 		&& mv squashfs-root linuxdeploy-root )
 fi
 PATCHELF=$(find "$LDROOT" -name patchelf -type f | head -1)
-for so in "$APPDIR"/usr/lib/*.so; do "$PATCHELF" --set-rpath '$ORIGIN' "$so"; done
+for so in "$APPDIR"/usr/lib/*.so "$APPDIR"/usr/lib/*.so.*; do
+	[ ! -e "$so" ] || "$PATCHELF" --set-rpath '$ORIGIN' "$so"
+done
 for so in $(find "$APPDIR/usr/lib/addons" -name '*.so'); do
 	"$PATCHELF" --set-rpath '$ORIGIN/../..' "$so"
 done

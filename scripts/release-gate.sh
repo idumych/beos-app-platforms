@@ -17,7 +17,8 @@ E=$D/evidence
 HPKG=${APP_CMD}-${V}-${REVISION}-x86_64.hpkg
 APPIMG=${APP_NAME}-${V}-x86_64.AppImage
 APPIMG_ARM64=${APP_NAME}-${V}-aarch64.AppImage  # started in CI on arm64 hardware (X11 + Wayland)
-PLATFORMS="haiku linux"
+PLATFORMS=${PLATFORMS:-haiku linux}   # haiku-app.env: "linux" for a Linux-only app
+has() { case " $PLATFORMS " in *" $1 "*) return 0 ;; esac; return 1; }
 REQUIRED="install attrs launch $FEATURE_CHECKS log-clean quit"
 pass=0 fail=0
 ok()  { echo "PASS $1"; pass=$((pass + 1)); }
@@ -40,8 +41,9 @@ shots=0
 for img in $(grep -oE '\]\(docs/screenshots/[^)]+\.(png|jpg)\)' README.md 2>/dev/null | sed 's/^](//; s/)$//'); do
 	[ -s "$img" ] && git ls-files --error-unmatch "$img" >/dev/null 2>&1 && shots=$((shots + 1))
 done
-[ $shots -ge 2 ] && ok "readme screenshots ($shots)" \
-	|| bad "readme screenshots" "README.md shows $shots committed docs/screenshots/ images; need one per platform (2+)"
+NSHOTS=$(echo $PLATFORMS | wc -w)
+[ $shots -ge $NSHOTS ] && ok "readme screenshots ($shots)" \
+	|| bad "readme screenshots" "README.md shows $shots committed docs/screenshots/ images; need one per platform ($NSHOTS+)"
 
 for p in $PLATFORMS; do
 	a=$(art $p); f=$E/$p.txt
@@ -74,7 +76,9 @@ for p in $PLATFORMS; do
 	[ $i -gt 1 ] || bad "$p evidence" "haiku-app.env defines no EVIDENCE_1"
 done
 
-field "$E/haiku.txt" os | grep -q 'hrev59866' && ok "haiku os" || bad "haiku os" "os: line does not show Haiku R1/beta6 (hrev59866)"
+if has haiku; then
+	field "$E/haiku.txt" os | grep -q 'hrev59866' && ok "haiku os" || bad "haiku os" "os: line does not show Haiku R1/beta6 (hrev59866)"
+fi
 
 # the AppImage must be a CI build of HEAD (appimage.yml)
 RUN=$(field "$E/linux.txt" ci-run)
@@ -112,9 +116,10 @@ fi
 # the arm64 .hpkg (optional: only apps that need nothing from HaikuPorts; haiku-arm64.md),
 # tested on an arm64 nightly in QEMU
 HPKG_ARM64=${APP_CMD}-${V}-${REVISION}-arm64.hpkg
-N=3
-if [ -s "$D/$HPKG_ARM64" ]; then
-	N=4; f=$E/haiku-arm64.txt
+N=2; WHAT="2 AppImages"
+has haiku && { N=3; WHAT="hpkg, 2 AppImages"; }
+if has haiku && [ -s "$D/$HPKG_ARM64" ]; then
+	N=4; WHAT="$WHAT, arm64 hpkg"; f=$E/haiku-arm64.txt
 	[ "$(field "$f" sha256)" = "$(sha256sum "$D/$HPKG_ARM64" | cut -d' ' -f1)" ] && ok "haiku-arm64 sha256" \
 		|| bad "haiku-arm64 sha256" "$f missing or for a different file than $D/$HPKG_ARM64"
 	[ "$(field "$f" commit)" = "$HEAD" ] && ok "haiku-arm64 commit" || bad "haiku-arm64 commit" "tested build is from '$(field "$f" commit)', HEAD is $HEAD"
@@ -126,7 +131,7 @@ fi
 
 if [ -s "$D/SHA256SUMS" ] && (cd "$D" && sha256sum -c --quiet SHA256SUMS) >/dev/null 2>&1 \
 	&& [ "$(grep -c . "$D/SHA256SUMS")" = $N ]; then ok SHA256SUMS
-else bad SHA256SUMS "$D/SHA256SUMS missing, wrong, or not exactly the $N artifacts (hpkg, 2 AppImages$( [ $N = 4 ] && echo ', arm64 hpkg'))"; fi
+else bad SHA256SUMS "$D/SHA256SUMS missing, wrong, or not exactly the $N artifacts ($WHAT)"; fi
 
 echo
 if [ $fail = 0 ]; then

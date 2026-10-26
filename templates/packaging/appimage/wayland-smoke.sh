@@ -10,6 +10,11 @@
 # appimage.yml runs it after building the AppImage.
 set -u
 APP=$(readlink -f "$1")
+# Arguments for the app: SMOKE_ARGS from the environment, else from haiku-app.env in the
+# current directory (e.g. a local server address, so the app doesn't reach the internet).
+if [ -z "${SMOKE_ARGS+x}" ] && [ -f haiku-app.env ]; then
+	SMOKE_ARGS=$(. ./haiku-app.env; printf '%s' "${SMOKE_ARGS:-}")
+fi
 OUT=$(mkdir -p "${2:-wayland-smoke}" && cd "${2:-wayland-smoke}" && pwd)
 export XDG_RUNTIME_DIR=$(mktemp -d)
 chmod 700 "$XDG_RUNTIME_DIR"
@@ -30,7 +35,7 @@ fi
 
 HOME_DIR=$(mktemp -d)
 env -u DISPLAY WAYLAND_DISPLAY=$SOCK COSMOE_BACKEND=wayland APPIMAGE_EXTRACT_AND_RUN=1 \
-	WAYLAND_DEBUG=client HOME="$HOME_DIR" "$APP" > "$OUT/app.log" 2> "$OUT/wayland-debug.log" &
+	WAYLAND_DEBUG=client HOME="$HOME_DIR" "$APP" ${SMOKE_ARGS:-} > "$OUT/app.log" 2> "$OUT/wayland-debug.log" &
 PID=$!
 sleep 15
 if ! kill -0 $PID 2>/dev/null; then

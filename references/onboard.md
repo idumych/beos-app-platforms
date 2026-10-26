@@ -80,6 +80,11 @@ These must agree, and the gate checks them:
 - `VERSION` = the .rdef `app_version` (`major`/`middle`/`minor`)
 - `APP_NAME` = the Makefile `NAME` = the binary's file name
 
+A network or device client must not reach a real service from CI: set `SMOKE_ARGS` to
+whatever points it at nothing real (e.g. a server address of `127.0.0.1`). The smoke tests
+start the app with those arguments; a template that doesn't fit an app gets an option like
+this, in the skill, rather than a forked copy in the app.
+
 Haiku licence names must match a file in `/boot/system/data/licenses` on
 the Haiku VM (`ssh haiku-b6-test ls /boot/system/data/licenses`), e.g.
 `GNU GPL v3`, `MIT`. If none matches, the package must ship the licence
