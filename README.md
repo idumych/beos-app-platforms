@@ -11,9 +11,10 @@ It's written as instructions an agent follows, with scripts and templates beside
 | **Porting** an app to the native Haiku API, from Qt, GTK, SDL or a Linux-only stack | A check that nobody has ported it already; reference screenshots of the original before any UI code, measured and compared after every change; a portable core with no Haiku headers; the API traps; a vector icon encoder; UI tests through `hey` scripting. For audio apps, a Media Kit filter node between the system mixer and the sound card |
 | **Building** one tree for several systems | Makefile platform detection, a `-DAPP_COSMOE` style switch for the few real differences, and the porting traps of each system |
 | **Testing** every package where it will run | Headless VMs (VirtualBox or QEMU/KVM) driven by keyboard, mouse, screenshots, OCR and SSH; Linux builds under Xvfb; X11 and Wayland smoke tests in CI on x86_64 and aarch64; audio checked from a capture of the guest's sound card |
+| **Theming** the system: window decorators, control looks, colours and fonts | How app_server decorator add-ons and libbe control looks are built and what they can't do, a theme tool that saves and restores the previous look, and shipping one look to many Renku and Haiku builds as a zip that compiles on the target |
 | **Releasing** | Onboarding templates for any app, a build of every package from one commit, a scripted test of each with evidence files, and a release gate that checks the raw evidence and then stops for a human |
 
-Claude loads it when a task involves building, porting, packaging, releasing or VM-testing a Haiku-API app, for example "is it worth porting X to Renku?", "port this to the native Haiku UI", "test it on Renku", "make a release" or "check the AppImage".
+Claude loads it when a task involves building, porting, packaging, releasing or VM-testing a Haiku-API app, for example "is it worth porting X to Renku?", "port this to the native Haiku UI", "test it on Renku", "make a release", "make a window decorator" or "check the AppImage".
 
 ## Platforms
 
@@ -55,6 +56,12 @@ Each of these cost real time once, and is now a paragraph, a check or a script.
 - Audio checks from QEMU's capture of the guest's sound card: the rate conversion leaves single-sample kinks that a naive click counter reports as glitches with or without the code under test. The checker counts only real dropouts (phase jumps, silence), and judges a node only against runs without it on the same host.
 - Smaller things with outsized cost: `pkill -f` matching its own command line; `gh` in a fork looking at the upstream repository's CI; `Ctrl/Alt+A` selecting the document instead of a field.
 
+**Theming**
+- A window decorator runs inside app_server and links against its binary, so it is tied to that build's private ABI, and a crash takes the desktop down. An `.hpkg` would have to pin the exact `haiku` version. Instead the decorator and control look interfaces were checked to be unchanged from Haiku R1/beta6 to current Renku, the 54 private headers they need are bundled, and a zip's `install.sh` builds them on the target into `~/config/non-packaged`. Every install script and README gives the safe-mode way back ("Disable user add-ons").
+- Overwriting an add-on that apps have mapped crashed them; installs now copy to `.new` and rename. `pkgman install` of the same version silently did nothing, so screenshots showed the old build; now uninstall first and compare checksums.
+- Drawing traps: app_server's `Window.h` shadowing the kit's (use `-iquote`); `TabDecorator` moving custom tab buttons back; highlighted menu labels drawn invisibly without `PushState`/`PopState`; layouts shifting when a control look changes Haiku's frame insets; a theme tool saving default colours because it had no `BApplication`.
+- An app_server bug: windows open during a decorator switch keep the old content region until resized (`Window::ReloadDecor()` doesn't reset `fContentRegionValid`).
+
 **Releasing**
 - Releases that claimed more than was tested. Now every package writes an evidence file, the gate script reads only raw evidence, the release notes' "Tested" section must match it, and the pipeline stops for a human before publishing, then re-tests from the release URLs.
 
@@ -63,6 +70,7 @@ Each of these cost real time once, and is now a paragraph, a check or a script.
 - [Folio](https://github.com/idumych/folio), a notebook app: onboarded with the templates, shipped for Haiku/Renku and Linux.
 - [Sheath](https://github.com/idumych/sheath): the `.hpkg` built and tested in GitHub CI with no local VM.
 - [EasyPaint](https://github.com/idumych/EasyPaint) (branch `haiku-native`): a Qt 5 paint program ported to the native API and released.
+- [Gonx](https://github.com/idumych/gonx): a full system look (decorator, control look, colours, fonts) for Renku and Haiku from a 2001 BeOS concept, released as a zip that builds on the target and tested on both.
 - JamesDSP for Linux: evaluated for Renku; its DSP engine runs as a Media Kit node in a Renku VM (a proof of concept, not a release).
 
 ## Install
@@ -89,6 +97,7 @@ Or, to share it with one project's collaborators, put it in that project's `.cla
 | `references/haiku-arm64.md` | The arm64 `.hpkg`: cross toolchain and sysroot, the QEMU test machine, what can't be built yet |
 | `references/cosmoe-linux.md` | Hokku/Cosmoe: using and fixing Hokku, porting traps, the AppImage, CI, headless X11 and Wayland tests |
 | `references/virtualbox.md` | Driving VMs: scancodes, mouse, screenshots, files, hangs |
+| `references/theming.md` | System looks: window decorators, control looks, colours and fonts; one look for many Renku/Haiku builds; cross-building and deploying; comparing against reference art |
 | `references/folio.md` | Worked example: an app set up with the templates |
 | `scripts/make-vm.sh`, `scripts/vm.sh`, `scripts/mouse.py` | VirtualBox: create a VM from an image; keys, text, mouse, screenshots |
 | `scripts/qemu-vm.sh`, `scripts/qmp-input.py` | QEMU/KVM x86_64 VM: create, start, keys, pointer, screenshots, the guest's audio to a WAV file |
