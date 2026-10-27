@@ -27,6 +27,9 @@ field() { sed -n "s/^$2: *//p" "$1" 2>/dev/null | head -1; }
 art() { case $1 in haiku) echo $HPKG ;; linux) echo $APPIMG ;; esac; }
 
 HEAD=$(git rev-parse HEAD)
+# In a fork with an "upstream" remote, gh picks the upstream repo by default
+# and can't find this repo's CI runs; name the repo explicitly.
+GHR=${GITHUB_REPO:+-R $GITHUB_REPO}
 echo "platforms checked: $PLATFORMS"
 for p in $PLATFORMS; do
 	case $p in haiku|linux) ;; *) bad platforms "unknown platform '$p' in PLATFORMS (haiku, linux)" ;; esac
@@ -88,7 +91,7 @@ fi
 if has linux; then
 # the AppImage must be a CI build of HEAD (appimage.yml)
 RUN=$(field "$E/linux.txt" ci-run)
-got=$(gh run view "$RUN" --json headSha,conclusion,workflowName -q '.headSha+" "+.conclusion+" "+.workflowName' 2>/dev/null)
+got=$(gh run view $GHR "$RUN" --json headSha,conclusion,workflowName -q '.headSha+" "+.conclusion+" "+.workflowName' 2>/dev/null)
 if [ -n "$RUN" ] && echo "$got" | grep -qx "$HEAD success appimage"; then
 	ok "linux from CI run $RUN (appimage)"
 else bad "linux ci" "ci-run '$RUN' is not a successful appimage run of HEAD (got: $got)"; fi
@@ -104,7 +107,7 @@ else
 		|| bad "linux-arm64 sha256" "evidence is for a different file than $D/$APPIMG_ARM64"
 	[ "$(field "$f" commit)" = "$HEAD" ] && ok "linux-arm64 commit" || bad "linux-arm64 commit" "tested build is from '$(field "$f" commit)', HEAD is $HEAD"
 	RUN=$(field "$f" ci-run)
-	got=$(gh run view "$RUN" --json headSha,conclusion,workflowName -q '.headSha+" "+.conclusion+" "+.workflowName' 2>/dev/null)
+	got=$(gh run view $GHR "$RUN" --json headSha,conclusion,workflowName -q '.headSha+" "+.conclusion+" "+.workflowName' 2>/dev/null)
 	echo "$got" | grep -qx "$HEAD success appimage" && ok "linux-arm64 from CI run $RUN" \
 		|| bad "linux-arm64 ci" "ci-run '$RUN' is not a successful appimage run of HEAD (got: $got)"
 	for c in install x11 wayland; do

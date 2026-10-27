@@ -54,12 +54,29 @@ passes by luck. Run scripts with `bash`: zsh aborts a whole command on an unmatc
 ## Driving the UI
 
 1. `shot:<name>` (vm.sh or xtest.sh), then `ocr-find.sh $S/<name>.png <Label>` for X Y; `--text`
-   shows everything OCR read. Small or grey labels may need a nearby word.
+   shows everything OCR read. Small or grey labels may need a nearby word. What OCR misses:
+   - **window titles**: Haiku's bold title on the yellow tab came out lowercase ("untitled"),
+     and Openbox's white-on-blue title not at all. Match case-insensitively, and prefer one of
+     the app's own labels (a menu name such as "Effects") for `launch`;
+   - **small text on a large black root window** (Xvfb): OCR a crop of the app's window too;
+   - **text along the top edge of a crop** (a menu bar in a window crop): OCR the whole screen
+     too. Concatenating both readings into `<p>-screen.txt` is fine; both are the same shot.
 2. Click: `m:click,X,Y` in a VM, `c:X,Y` under Xvfb. Menu items: hover first (virtualbox.md).
-3. Type: click into the field, select all (Haiku `k:38,1e,9e,b8`; Xvfb `k:ctrl+a`), then `t:<text>`.
+   A VM with a PS/2 pointer takes no absolute clicks: drive the app with `hey`
+   (porting.md § 6, `hey-ui.sh`) and say so in the release notes' "Tested" section.
+3. Type: click into the field, select all, then `t:<text>`. Select all is Haiku `k:38,1e,9e,b8`
+   and Xvfb `k:ctrl+a`, but only if the app has no Select all menu item of its own: Ctrl/Alt+A
+   then selects the whole document (EasyPaint), and the digits are appended to the field.
+   Clear such a field with `k:End` and `k:BackSpace` instead.
 4. Screenshot after every action and confirm it worked before the next one. Name shots
    `<p>-<step>.png`. Quote the OCR word *and* a log or file line in the evidence: a screenshot
    of the wrong window has passed for success before.
+5. Window positions: `eval $(xdotool getwindowgeometry --shell $W | sed 's/^/G_/')`. Without
+   the prefix it sets `X`, `Y`, `WIDTH`, `HEIGHT`, `SCREEN` and `WINDOW`, and `X` is the
+   evidence file in the `chk` helper above.
+6. Every part of a PASS condition is a check. "The red rectangle and the text" needs the
+   text in OCR *and* a red pixel on the rectangle's edge (PIL `getpixel`; sample a few pixels
+   around the expected line, which may be one off).
 
 ## Test VM
 
@@ -69,6 +86,11 @@ which known-good VMs exist to clone from) in your local notes or memory, not in 
 | VM | SSH alias | Host port | Firmware, screen | Guest user | Command key |
 |---|---|---|---|---|---|
 | `haiku-b6-test` | `haiku-b6-test` | 127.0.0.1:2224 | BIOS, 1024×768 | `user` (uid 0) | **Alt** |
+
+**No `haiku-b6-test` on this machine?** Ask before using any other Haiku VM, even for one
+release (EasyPaint 0.2.0 was tested on the user's own R1/beta6 VM with their permission).
+Don't change its settings: if it boots a live ISO first, use the F12 boot menu
+(virtualbox.md), and shut it down from inside when done. Note it as a `DECISION`.
 
 **Only drive this one.** Never start, stop, modify or delete any other VM; the one thing you
 may do with another VM is clone *from* it while it's powered off.
@@ -110,7 +132,11 @@ Haiku starts sshd by itself (`uname -a` shows `hrev59866`).
     ssh haiku-b6-test "ps | grep -v grep | grep -c '/$APP_PATH'"    # quit: 0 (count your own grep out)
     scp haiku-b6-test:/tmp/app.log $E/haiku-app.log
 
-A GUI app started over SSH appears on the Haiku desktop. If `pkgman` asks for confirmation
+A GUI app started over SSH appears on the Haiku desktop. **Wake the screen first:** after a
+few idle minutes Haiku's screen blanker turns the screen black, and the first key or click
+only wakes it (screenshots come out black, the first typed letter is lost). Send a relative
+mouse move through `vboxapi` (`session.console.mouse.putMouseEvent(30, 0, 0, 0, 0)`, then
+back) before launching, and again before typing after any long step. If `pkgman` asks for confirmation
 even with `-y`, a dependency is missing: add it to `HPKG_REQUIRES_EXTRA` and the test plan.
 
 ## Linux (the CI AppImage, under Xvfb)
@@ -125,6 +151,10 @@ even with `-y`, a dependency is missing: add it to `HPKG_REQUIRES_EXTRA` and the
     sh $P/xtest.sh k:ctrl+q w:3; pgrep -x "$APP_NAME" || echo gone
     cp $S/app.log $E/linux-app.log
 
+- AppImageLauncher on the host intercepts AppImages with an "integrate" dialog: `xtest.sh`
+  sets `APPIMAGELAUNCHER_DISABLE=1`; set it yourself when you start one another way. Its
+  bypass prints one `[appimagelauncher-binfmt-bypass/interpreter]` line into the app log;
+  it has no error words, so leave the log as it is.
 - `install`: `check-artifact.sh appimage` passed and the file is the CI artifact (`ci-run:`).
   `attrs`: `strings -a` of the extracted binary shows `$APP_SIG`.
 - `wayland`: look at `smoke-x86_64/wayland-smoke/wayland-screenshot.png` from the same CI run,

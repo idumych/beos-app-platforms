@@ -48,6 +48,11 @@ Every session starts with:
 
     . ./haiku-app.env; V=$VERSION; D=dist/$V; mkdir -p $D/evidence $D/shots
     HEAD=$(git rev-parse HEAD); BRANCH=$(git branch --show-current)
+    gh repo set-default "$GITHUB_REPO"    # a fork's clone otherwise points gh at upstream
+
+`gh repo set-default` matters for apps forked from another project (EasyPaint): with an
+`upstream` remote, `gh run list/view/download` without `-R` look in the upstream repo and
+report "not found" for your runs.
 
 ## Phases
 
@@ -172,8 +177,12 @@ fails partway, don't delete or recreate anything: report the state and ask.
   didn't run is a FAIL. Write evidence lines only after the condition was checked.
 - **Never weaken a check.** Don't edit `check-artifact.sh`, `release-gate.sh`, tests or evidence
   to get a pass. If a check looks wrong, leave it failing and say why.
-- **Processes:** `pkill -x <Name>`, never `pkill -f <pattern>`. Wait with a bounded loop
+- **Processes:** `pkill -x <Name>`, never `pkill -f <pattern>`. `-x` matches the
+  kernel's process name, which is cut to 15 characters (`AppImageLauncher` never matches);
+  close such windows with `xdotool windowclose` instead. Wait with a bounded loop
   (`for i in $(seq 60); do <check> && break; sleep 5; done`), never an open-ended `sleep`.
+- **Throwaway directories:** make a new one with `mktemp -d` rather than `rm -rf "$DIR"`;
+  the harness may refuse a removal whose path is a variable.
 - **Long jobs** (CI, VM boot, Hokku build) run with a timeout or in the background; don't block
   for more than 10 minutes.
 - Upstream bugs go in your report for the human (and SKILL.md's rules on where they're filed).
@@ -198,6 +207,15 @@ fails partway, don't delete or recreate anything: report the state and ask.
 - The aarch64 X11 smoke test passed with an all-black screenshot: it only checked that the
   process stayed up. The smoke scripts now fail on a one-colour screenshot and on a window
   that never becomes visible. Look at every screenshot you cite.
+- A test passed while its screenshot contradicted the test plan (a black rectangle where the
+  plan said red): the check only looked for the text. Turn every part of a PASS condition
+  into code (a colour is a pixel read with PIL), and look at the shot anyway.
+- A Haiku release retest failed because the VM's screen blanker was on: the first typed
+  letter only woke it, so the file was saved as `asypaint-release.png`. Wake the screen
+  before each interactive run (release-test.md § Haiku).
+- `eval $(xdotool getwindowgeometry --shell …)` set `X`, which was the evidence file in the
+  test script's `chk` helper, so later checks were written to files named `239` and `240`
+  in the project root. Prefix its variables (release-test.md § Driving the UI).
 - On the slower arm64 runner, a window mapped while Openbox was still starting stayed unmapped.
   Start the app only once the WM answers EWMH queries (`xdotool get_desktop`); `x11-smoke.sh`
   does, and do the same when you start Xvfb + Openbox by hand.
