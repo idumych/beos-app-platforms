@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # qmp-input.py SOCK ACTION X Y   — ACTION: move | click | dclick | rclick
-# Absolute pointer on QEMU's usb-tablet through QMP; X, Y in screen pixels (1024x768).
-import json, socket, sys, time
+# Absolute pointer on QEMU's usb-tablet through QMP; X, Y in screen pixels.
+# Screen size from QW/QH (default 1024x768; Haiku x86_64 under -vga std picks 1280x800).
+import json, os, socket, sys, time
 sock, action, x, y = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-W, H = 1024, 768
+W, H = int(os.environ.get('QW', 1024)), int(os.environ.get('QH', 768))
 s = socket.socket(socket.AF_UNIX); s.connect(sock); f = s.makefile('rw')
 def cmd(c):
     f.write(json.dumps(c) + '\n'); f.flush()

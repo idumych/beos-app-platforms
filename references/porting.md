@@ -5,6 +5,45 @@ into a BeOS-style app. Worked example: EasyPaint, a Qt 5 paint program ported
 in Oct 2026 (github.com/idumych/EasyPaint, branch `haiku-native`; a GitHub
 fork of the source it came from, with the port on top of upstream history).
 
+## 0. Check that nobody has ported it already — before anything else
+
+Do this before evaluating, planning or writing code (JamesDSP's port was evaluated and
+half-built before anyone looked). `N` is the app's name, plus any short name or package
+name it goes by (`jdsp`, `jamesdsp`); `OWNER/REPO` is the upstream repository.
+
+```sh
+# HaikuPorts recipes (13k-entry tree, not truncated): a recipe means a package exists or did
+gh api 'repos/haikuports/haikuports/git/trees/master?recursive=1' -q '.tree[].path' | grep -i "$N"
+# the packages a Haiku/Renku guest can install (HaikuPorts + Renku's own repository);
+# `pkgman search N`, not `search -a`, which lists everything
+ssh <guest> "pkgman search $N"
+# forum posts (read-only; the JSON's hits are under "posts", "topics" may be empty)
+curl -s "https://discuss.haiku-os.org/search.json?q=$N" | python3 -c \
+  'import json,sys; [print(p["topic_id"], p["blurb"][:100]) for p in json.load(sys.stdin).get("posts",[])]'
+# GitHub: repositories, and upstream issues/PRs that mention Haiku
+gh search repos "$N haiku" ; gh search repos "$N beos"
+gh search issues haiku --repo OWNER/REPO ; gh search prs haiku --repo OWNER/REPO
+# forks of upstream with a haiku/beos/renku branch (a port usually lives on a branch
+# of a fork with the original name, e.g. idumych/EasyPaint haiku-native); scan the
+# source repo's forks (gh api repos/X -q .source.full_name if you start from a fork)
+gh api "repos/OWNER/REPO/forks?per_page=100" --paginate -q '.[].full_name' | while read f; do
+  gh api "repos/$f/branches?per_page=100" -q '.[].name' 2>/dev/null \
+    | grep -iE 'haiku|beos|renku' | sed "s|^|$f: |"; done
+```
+
+Also look at HaikuDepot's web page (depot.haiku-os.org) and the Renku package repository
+issues, and ask the user whether they know of one.
+
+Then report what you found **before starting**, with links, and let the user decide:
+
+- **A native port exists:** use or improve it (on its fork, or as a fork of it), rather
+  than starting over.
+- **The app already runs through Qt/GTK** (a HaikuPorts package of the original): say so;
+  a native port is then a choice of look, size and arm64 support, not a necessity.
+- **A dependency is the real gap** (e.g. no Haiku backend for the audio system it needs):
+  that shapes the plan (the risky part first, see media-kit.md for audio).
+- **Nothing found:** say which searches came back empty, and go on.
+
 ## 1. Get reference screenshots of the original — before writing any UI
 
 The native version must look and feel like the original, at the original's
@@ -51,6 +90,10 @@ compact spin field. The user caught it from a screenshot.
    section.
 
 ## 2. Read the whole original first
+
+For an app whose hard part isn't the UI (audio routing, system services, drivers),
+prototype that part first, headless, and test it end to end before porting any UI
+(JamesDSP: the Media Kit filter node, media-kit.md).
 
 List every menu item, tool, dialog, setting and command-line option, and
 map each to its native counterpart. Note the original's bugs as you go and

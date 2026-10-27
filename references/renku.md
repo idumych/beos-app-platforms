@@ -21,24 +21,46 @@ libraries wait for a HaikuPorts arm64 repository.
 ## Make a test VM
 
 ```sh
-sh scripts/make-vm.sh <name> ~/Downloads/RenkuOS-x86_64-<date>-build<NNN>.iso
+sh scripts/make-vm.sh <name> ~/Downloads/RenkuOS-x86_64-<date>-build<NNN>.iso     # VirtualBox
+DIR=~/VMs/<name> sh scripts/qemu-vm.sh create ~/Downloads/RenkuOS-x86_64-….iso   # or QEMU/KVM
+DIR=~/VMs/<name> sh scripts/qemu-vm.sh start
 ```
+
+Use QEMU when the user prefers it or VirtualBox misbehaves; it's also the way to capture
+the guest's audio output exactly (`AUDIO=wav`, media-kit.md § Testing). Under QEMU's
+`-vga std` the screen is 1280×800 (set `QW=1280 QH=800` for the pointer, which
+qemu-vm.sh does), the usb-tablet pointer takes absolute clicks, and Renku writes kernel
+output to the serial log without the boot-menu option. KVM fails while any VirtualBox VM
+is running: power those off first (and stop any background loop that restarts them).
 
 The ISO is an *anyboot* hybrid image, so converted to VDI it boots as a writable hard disk with BIOS firmware. The screen is 1024×768. The same applies to Haiku's own anyboot images.
 
 - **First screen:** "Welcome!", with **Try it out** at about (778,566). It leads to the desktop, logged in, with the Deskbar top-right.
 - **Terminal:** click the Deskbar logo at (955,12), hover Applications (785,226), move left (640,226), go down to Terminal at about (625,707), then click. Screenshot first; positions shift as the menu changes.
-- **Free space:** about 300 MB on the boot disk. Packages stay compressed, so `pkgman install gcc make` fits. `haiku_devel` was already installed on the Haiku beta6 image.
+- **Free space:** about 300 MB on the boot disk. Packages stay compressed, so `pkgman install gcc make` fits. `haiku_devel` was already installed on the Haiku beta6 image; Renku nightlies lack it (§ Build an hpkg).
 - **Clock:** the VM clock runs in local time while the host assumes UTC, so tar and make warn "time stamp in the future". Fix with `find . -exec touch {} +`, or rely on `make clean`.
 - **Screen blanker:** if a screenshot is black, move the mouse (`m:move,…`) and take it again.
 
 ### When it hangs on the boot splash
 
-Haiku R1/beta6 (hrev59866+79) hung with all splash icons lit on most boots in VirtualBox 7.2.22, whatever the disk controller, graphics, CPU count, audio or second disk. An older nightly (hrev59741) booted every time in the same VM. To see why:
+Symptom: the splash with all icons lit (or a black screen) forever; the kernel debugger's
+`teams` shows no `app_server` and `media_server` with a team ID in the tens of thousands,
+restarting in a loop inside `runtime_loader` (page fault, `bt` ends in `load_program`).
 
-1. **Serial log:** with the VM off, `VBoxManage modifyvm <vm> --uart1 0x3F8 4 --uartmode1 file <path>`. The image doesn't log to serial by default: press Space repeatedly right after starting (`k:39,b9`) to get the boot menu, then **Select debug options → Enable serial debug output** → Return → **Continue booting**. The option lasts one boot.
-2. **Kernel debugger:** Alt+SysRq+D = `k:38,54,20,a0,d4,b8`. Type commands with `t:` and Enter; output goes to the serial log. Useful ones: `teams`, `threads <team>`, `bt <thread>`, `syslog | grep <word>`, `syslog | tail 30`.
-3. In that hang, `teams` showed no `app_server`, and `media_server` with a team ID in the tens of thousands (restarting in a loop inside `runtime_loader`).
+- **Renku hrev60072+355 (build00064), Oct 2026: a freshly copied image boots; every later
+  boot of the same disk hangs**, in VirtualBox and in QEMU alike (6 of 6 reboots). So copy
+  the ISO again for each boot (`qemu-vm.sh create`, or a new VDI), and redo SSH and
+  toolchain setup, or keep the VM running between sessions. The cause isn't known yet;
+  if it's still there on a newer nightly, it's worth a RenkuOS/Source issue (ask the user).
+- Haiku R1/beta6 (hrev59866+79) showed the same hang on most boots in VirtualBox 7.2.22,
+  whatever the disk controller, graphics, CPU count, audio or second disk; nightly
+  hrev59741 booted every time. It's not a VirtualBox bug, and the audio driver setting
+  doesn't change it.
+
+To look inside:
+
+1. **Serial log:** VirtualBox: with the VM off, `VBoxManage modifyvm <vm> --uart1 0x3F8 4 --uartmode1 file <path>`. Haiku beta6 doesn't log to serial by default: press Space repeatedly right after starting (`k:39,b9`) to get the boot menu, then **Select debug options → Enable serial debug output** → Return → **Continue booting** (lasts one boot). QEMU: qemu-vm.sh always writes `$DIR/serial.log`.
+2. **Kernel debugger:** Alt+SysRq+D = `k:38,54,20,a0,d4,b8` in vm.sh, `key alt-sysrq-d` in qemu-vm.sh. Type commands and Enter; output goes to the serial log. Useful ones: `teams`, `threads <team>`, `bt <thread>`, `syslog | grep <word>`, `syslog | tail 30`.
 
 ## Get files in and out
 
@@ -108,7 +130,29 @@ The pipeline builds it inside a Haiku R1/beta6 VM with `templates/packaging/buil
   work on Haiku.
 - `finddir B_USER_NONPACKAGED_DIRECTORY` exists, but there's **no** `B_USER_NONPACKAGED_APPS_DIRECTORY` constant. For a `make install`, append `/apps` yourself.
 
-So far packages have been **built** on Haiku beta6 and **tested** on Renku. Building directly on Renku should work the same way, but check that its repositories provide `gcc`/`haiku_devel` first.
+So far packages have been **built** on Haiku beta6 and **tested** on Renku. Building directly on Renku works (JamesDSP's media add-on, Oct 2026) with one catch:
+
+**`haiku_devel` can lag the nightly.** The Renku image has no system headers or startup
+objects, and its repository's `haiku_devel` was for an older build (hrev60072_341) than
+the image (…_355): `pkgman install haiku_devel` only offers to downgrade the system
+package, which needs a reboot (and reboots hang, above). Don't. Download the package and
+extract it next to the toolchain instead:
+
+```sh
+pkgman install -y gcc make
+mkdir -p ~/devel/sys && cd ~/devel
+curl -fsSLO <Renku repo base-url>/packages/haiku_devel-<version>-x86_64.hpkg   # base-url: pkgman list-repos -v
+package extract -C sys haiku_devel-*.hpkg
+D=~/devel/sys/develop
+INC="-idirafter $D/headers/posix -idirafter $D/headers -idirafter $D/headers/os"
+for d in $D/headers/os/*/; do INC="$INC -idirafter $d"; done
+make CPPFLAGS="-B$D/lib/ $INC" LDFLAGS="-B$D/lib/ -L/boot/system/lib"
+```
+
+`-B` finds `crti.o`/`crtn.o`/`init_term_dyn.o`; the libraries link from `/boot/system/lib`
+(the package's `develop/lib` symlinks point outside the extracted tree). Use `-idirafter`,
+not `-isystem`: libstdc++'s `<cstdlib>` does `#include_next <stdlib.h>`, which fails
+when the system headers come before gcc's own.
 
 ## Test checklist (Alt is the command key)
 

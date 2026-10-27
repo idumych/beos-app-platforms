@@ -120,10 +120,14 @@ When the user asks you to test in a VM they're using:
 ## Audio and hangs
 
 - **Host audio can hang power-off.** With VirtualBox 7.2.22 and PipeWire 1.6.10 (CachyOS, kernel 7.3), a VM whose audio driver is "default" (ALSA) gets stuck in `Stopping` on Power off or Reset; the log ends at `Console::powerDown(): A request to power off the VM has been issued`. Guest-initiated shutdown still works. Use `--audio-driver pulse`, or `--audio-driver null` when the guest only needs a device to exist. Kill a stuck VM by its process ID; a host reboot waits on it too.
+- **A Haiku-family guest stuck on the boot splash** is not a VirtualBox problem: the same
+  media_server hang happens under QEMU (renku.md § When it hangs). The audio driver setting
+  doesn't change it.
 - **Waiting for a guest:** the harness blocks chains of `sleep`. Poll screenshots in an `until` loop instead, e.g. until a pixel or the colour count says the desktop is up (`PIL.Image.open(shot).getcolors(1<<20)`).
 
 ## Hygiene
 
 - Shut a guest down from inside (`sync; shutdown` on Haiku-family) before changing VM settings, so installed packages are kept.
 - Never `pkill -f <word>` when the word is in your own command line: it kills the shell running it. Use `pkill -x <name>`.
+- Don't leave a background loop that starts VMs running when you switch to QEMU: a running VirtualBox VM makes KVM fail ("entry failed, hardware error 0x0").
 - To remove a test VM: `VBoxManage controlvm <vm> poweroff; VBoxManage unregistervm <vm> --delete`. Ask the user first; they may want to keep it.

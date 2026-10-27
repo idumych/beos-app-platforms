@@ -9,7 +9,7 @@ A BeOS-style app is C++ written against the Be/Haiku API (BApplication, BWindow,
 
 | Platform | What it is | Package | Built where | Tested how |
 |---|---|---|---|---|
-| **Renku OS** | Fork of Haiku; still names its system package `haiku`, version `r1~beta6` | `.hpkg` (`package create`), x86_64; arm64 cross-built for apps needing only Haiku's own libraries | Inside a Haiku R1/beta6 VM, over SSH (installs on Renku too) | VirtualBox VM: keyboard, mouse, screenshots |
+| **Renku OS** | Fork of Haiku; still names its system package `haiku`, version `r1~beta6` | `.hpkg` (`package create`), x86_64; arm64 cross-built for apps needing only Haiku's own libraries | Inside a Haiku R1/beta6 VM, over SSH (installs on Renku too) | VirtualBox or QEMU VM: keyboard, mouse, screenshots, captured audio |
 | **Linux** | Any desktop, through the Cosmoe library (the Hokku fork) | AppImage, **x86_64 and aarch64** | **CI** (Ubuntu 24.04, natively per architecture) for releases; locally only for porting | Xvfb + Openbox (X11); in CI on both architectures, X11 and headless sway (Wayland) |
 
 Read the reference file for what you're doing:
@@ -18,15 +18,17 @@ Read the reference file for what you're doing:
   - `references/onboard.md`: set an app up once: `haiku-app.env`, the Makefile contract, copying `templates/`, the app's `release/test-plan.md`
   - `references/release-test.md`: test each artifact on its platform and write the evidence the gate reads; the two shared test VMs
 - `references/haiku-arm64.md`: the arm64 `.hpkg`: cross toolchain and sysroot on Linux, the QEMU test machine, what can't be built yet
-- **Porting an app to the native Haiku API** (from Qt, GTK, SDL…): `references/porting.md`: reference screenshots of the original first, structure, API traps, a vector icon, testing through `hey`, README screenshots
-- `references/renku.md`: Renku OS (and Haiku-family guests in general): VM, SSH, building and checking an `.hpkg`, tests
+- **Porting an app to the native Haiku API** (from Qt, GTK, SDL…): `references/porting.md`: first a check that it hasn't been ported already, then reference screenshots of the original, structure, API traps, a vector icon, testing through `hey`, README screenshots
+- `references/renku.md`: Renku OS (and Haiku-family guests in general): VM (VirtualBox or QEMU), the boot hang, SSH, building on Renku when `haiku_devel` lags, checking an `.hpkg`, tests
+- `references/media-kit.md`: audio apps: a filter node between the system mixer and the sound card, the mixer auto-start trap, end-to-end audio tests from QEMU's capture of the guest's sound card
 - `references/cosmoe-linux.md`: Linux / Cosmoe: porting traps, the Makefile branch, AppImage bundling, CI, headless tests
 - `references/virtualbox.md`: driving any VM: scancodes, mouse via the VirtualBox SDK, screenshots, files in and out
 - `references/folio.md`: worked example: the Folio notebook app (github.com/idumych/folio), an app onboarded with the templates
 
 Helper scripts in `scripts/` (read each script's header first):
 
-- `make-vm.sh NAME IMAGE [efi]`: create and boot a VM from a copy of an ISO or raw image
+- `make-vm.sh NAME IMAGE [efi]`: create and boot a VirtualBox VM from a copy of an ISO or raw image
+- `qemu-vm.sh create|start|stop|shot|click|key|type`: the same in QEMU/KVM (x86_64), with the guest's audio output written to a WAV file
 - `vm.sh STEP…`: drive a VM (`VM=name`): `k:` scancodes, `t:` text, `m:` mouse, `w:` wait, `shot:` screenshot
 - `mouse.py`: absolute mouse input through `vboxapi` (needs the `virtualbox-sdk` package and a USB-tablet pointer in the VM)
 - `hey-ui.sh`: shell functions to source in a Haiku guest that send mouse messages and commands to an app's views with `hey` (when clicks don't work)
@@ -35,6 +37,7 @@ Helper scripts in `scripts/` (read each script's header first):
 - `serve-ssh-setup.sh`: one-time key-only SSH setup for a Haiku-family guest
 - `redactshot.py`: screenshot with private areas (account IDs, keys) blacked out before anything is written to disk
 - `ocr-find.sh SHOT [WORD|--text]`: a screenshot as text, with click positions
+- `tone.cpp` (built in the guest) and `sine-check.py`: play a sine through the system mixer and measure its level and dropouts in the captured WAV
 - `haiku-arm64-vm.sh`: a Haiku arm64 nightly in QEMU (start, screenshots, pointer and keys over QMP, copy files in); `qmp-input.py` is its pointer helper
 - `check-artifact.sh hpkg|appimage FILE`: static checks of a package
 - `release-gate.sh`: the final yes/no for a release, from raw evidence only
@@ -43,6 +46,7 @@ Helper scripts in `scripts/` (read each script's header first):
 
 ## Rules that matter
 
+- **Check for an existing port before starting a new one.** Search HaikuPorts, the guest's repositories, the Haiku forum, GitHub and the upstream repository's forks and issues (porting.md §0), report what you found, and let the user decide before evaluating or writing code.
 - **Never contact the Haiku project** (no Trac tickets, patches or forum posts), even for bugs that Renku or Cosmoe inherited from Haiku: the user says Haiku doesn't welcome AI contributions. Upstream reports go to **RenkuOS/Source** (AI-assisted work is explicitly allowed; keep write-ups short and plain); Cosmoe bugs are fixed in Hokku, never reported to haydentech/cosmoe (see below). File only after reproducing the bug in the platform's own code or bundled apps, not just in your app.
 - **Build release packages in CI, not against the user's local libraries,** unless the user says otherwise (release.md § CI). The `.hpkg` is built in a Haiku R1/beta6 VM.
 - **Build for both amd64 (x86_64) and arm64 (aarch64) on both platforms.** Every release ships both wherever the platform has an arm64 target:
