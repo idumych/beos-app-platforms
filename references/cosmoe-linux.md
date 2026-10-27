@@ -9,7 +9,7 @@ What it is like:
 
 - **No servers.** Wayland and X11 backends are plugins (`libcosmoe-x11.so`, `libcosmoe-wayland.so`), chosen at runtime. Override with `COSMOE_BACKEND=x11|wayland`.
 - **Relocatable.** It finds its add-ons (`<libdir>/addons`) and data relative to wherever `libbe.so` is loaded (`dladdr`), which is what makes an AppImage possible.
-- **Merged kits.** The translation kit, network kit and others are folded into `libbe`, so link `-lbe -ltracker`.
+- **Merged kits.** The translation kit, network kit and others are folded into `libbe`, so link `-lbe -ltracker`. `B_TRANSLATE` still needs `-llocalestub`, which Hokku installs as on Haiku.
 - **Build from source** (Hokku's `hokku` branch). Cosmoe's prebuilt `.deb`s target Ubuntu 26.04 only.
 
 ## Porting traps (check these first)
@@ -38,6 +38,8 @@ Rows marked **Fixed in Hokku** need nothing in the app. The others are still ope
 | `debugger()`, `ASSERT`'s `_debuggerAssert()`, `_debugPrintf()` | Upstream: `debugger()` silent; the helpers missing | **Fixed in Hokku**: stderr plus a backtrace. The release gate fails on `debugger` in the app log, so each one is a real bug to fix |
 | `BNotification::Send()` | Upstream: `system("notify-send \"…\"")`, so quotes or `$(…)` in the text run commands; blocks the caller | **Fixed in Hokku** (arguments to a detached `notify-send`, no shell) |
 | Opening any menu from a `BMenuBar` | Upstream: the tracking thread reads the menu bar unlocked (a Windows deadlock workaround), with `debugger("Looper must be locked")` each time | **Fixed in Hokku** (brief lock for the geometry reads). The release test should open a menu, since nothing else exercises this |
+| Writing pixels through `Bits()` of a `B_BITMAP_ACCEPTS_VIEWS` bitmap (a canvas the app fills, blits or clears itself) | Upstream: lost. Its views draw into a separate surface; `DrawBitmap()` draws that surface, and the next `Bits()` copied it back over the writes, so a canvas cleared to white showed as transparent | **Fixed in Hokku** (the bitmap tracks which copy changed; test `src/tests/kits/interface/bbitmap/BitmapBitsSyncTest`) |
+| Alpha of a `B_BITMAP_ACCEPTS_VIEWS` bitmap after its views drew | Copying the surface back to `Bits()` makes every pixel opaque | Open: keep translucent pixels in a bitmap without views, or fix it in Hokku when an app needs it |
 | Drawing from a thread that isn't the window's (e.g. a video thread calling `DrawBitmap` under `LockLooper`) | Not shown | Store the bitmap and `Invalidate()`; draw it in `Draw()` |
 
 When a trap is fixed in Hokku, remove the app's workaround and mark the row here.

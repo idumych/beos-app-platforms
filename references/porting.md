@@ -120,6 +120,10 @@ pixels.
 - **Synchronous alerts block scripting:** with unsaved changes,
   `hey <App> quit` waits on the save prompt forever. Test scripts kill the
   team instead.
+- **Never show or build paths from `entry_ref::name`:** on Cosmoe it is the
+  full path. Write a `LeafName(ref)` helper (`BEntry::GetName`) on day one and
+  use it for titles, save panels and messages, so the Linux build needs no
+  changes later (cosmoe-linux.md § Porting traps).
 - The renku.md notes still apply: no `BAboutWindow` in beta6 headers (use a
   `BAlert`).
 

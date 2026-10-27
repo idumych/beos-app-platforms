@@ -25,8 +25,11 @@ COSMOE_ROOT ?= /usr
 # All .cpp files, with their directories. Header dirs go in INCLUDES.
 SRCS     := src/App.cpp src/MainWindow.cpp
 INCLUDES := src
-# Libraries beyond the Haiku API (same on every platform), e.g. -lsqlite3 -lcrypto
+# Libraries beyond the Haiku API (same on every platform), e.g. -lsqlite3 -lcrypto.
+# An app that uses B_TRANSLATE needs -llocalestub (Haiku and Hokku both ship it).
 APP_LIBS :=
+# Files the .rdef imports (icons, PNG resources), so changing one rebuilds
+RSRC_DEPS :=
 
 override CXXFLAGS += $(addprefix -I,$(INCLUDES))
 
@@ -79,9 +82,12 @@ endif
 
 obj/%.o: %.cpp
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
-obj/$(NAME).rsrc.o: $(RDEF)
+# Header dependencies, so editing a header rebuilds what includes it
+-include $(OBJS:.o=.d)
+
+obj/$(NAME).rsrc.o: $(RDEF) $(RSRC_DEPS)
 	@mkdir -p obj
 	LD_LIBRARY_PATH=$(COSMOE_ROOT)/lib $(COSMOE_ROOT)/bin/rc -o obj/$(NAME).rsrc $(RDEF)
 	cd obj && ld -r -b binary $(NAME).rsrc -o $(NAME).rsrc.o
@@ -89,7 +95,7 @@ obj/$(NAME).rsrc.o: $(RDEF)
 		--add-section .note.GNU-stack=/dev/null \
 		--set-section-flags .note.GNU-stack=noload,readonly obj/$(NAME).rsrc.o
 
-$(NAME): $(OBJS) $(EXTRA_OBJS) $(RDEF)
+$(NAME): $(OBJS) $(EXTRA_OBJS) $(RDEF) $(RSRC_DEPS)
 	@mkdir -p obj
 	$(CXX) $(LDFLAGS) $(OBJS) $(EXTRA_OBJS) -o $@ $(LIBS)
 	$(RESOURCES)

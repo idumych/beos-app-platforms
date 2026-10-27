@@ -74,8 +74,8 @@ jobs:
 
       - name: X11 smoke test (Xvfb)
         timeout-minutes: 5
-        # env: SMOKE_WINDOW / SMOKE_PROCESS when the window title or process name doesn't
-        # start with the app's name (see x11-smoke.sh)
+        # SMOKE_WINDOW / SMOKE_PROCESS in haiku-app.env when the window title or process
+        # name doesn't start with the app's name (see x11-smoke.sh)
         run: sh packaging/appimage/x11-smoke.sh ${{ steps.app.outputs.file }} x11-smoke
 
       - name: Wayland smoke test (headless sway)

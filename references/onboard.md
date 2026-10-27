@@ -71,6 +71,9 @@ Then read the rest:
   src -r | sort -u`, and LIBS in the Makefile): each one goes in
   `APP_LIBS`, `HPKG_REQUIRES_EXTRA`, `APPIMAGE_MUST_BUNDLE` and
   `APPIMAGE_APT_EXTRA`.
+- If it uses `B_TRANSLATE` (`grep -rln B_TRANSLATE src`), add `-llocalestub` to
+  `APP_LIBS`: Haiku and Hokku both ship `liblocalestub.a`.
+- List the files its .rdef imports (`grep -n import *.rdef`) in `RSRC_DEPS`.
 - List the image formats it reads or writes through the Translation Kit
   (`grep -rn 'BTranslationUtils\|BTranslatorRoster' src`): they go in
   `APPIMAGE_TRANSLATORS`. None = `""`; PNG alone covers app artwork.
@@ -87,6 +90,11 @@ These must agree, and the gate checks them:
 - `APP_SIG` = `resource app_signature` in the .rdef
 - `VERSION` = the .rdef `app_version` (`major`/`middle`/`minor`)
 - `APP_NAME` = the Makefile `NAME` = the binary's file name
+
+The X11 smoke test waits for a window whose title starts with `APP_NAME`. A document app
+that titles its windows after the document ("Untitled", the file name) sets
+`SMOKE_WINDOW` to the first window's title, e.g. `SMOKE_WINDOW="Untitled"`;
+`SMOKE_PROCESS` likewise when the process isn't called `APP_NAME`.
 
 A network or device client must not reach a real service from CI: set `SMOKE_ARGS` to
 whatever points it at nothing real (e.g. a server address of `127.0.0.1`). The smoke tests

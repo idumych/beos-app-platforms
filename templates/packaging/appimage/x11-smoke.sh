@@ -6,7 +6,9 @@
 #
 # The app's window title and process name are taken to start with <App>; set SMOKE_WINDOW
 # (start of a window title) and SMOKE_PROCESS (process name) when they don't, e.g.
-# SMOKE_WINDOW="VideoLAN Client" SMOKE_PROCESS=vlc.
+# SMOKE_WINDOW="VideoLAN Client" SMOKE_PROCESS=vlc, or SMOKE_WINDOW="Untitled" for a
+# document app that names its windows after the document. Like SMOKE_ARGS, they come
+# from the environment, else from haiku-app.env.
 #
 # Uses Xvfb with Openbox (without a window manager Cosmoe windows get no focus) and
 # ImageMagick's import for the screenshot. Ubuntu: apt-get install --no-install-recommends
@@ -19,6 +21,12 @@ APP=$(readlink -f "$1")
 # current directory (e.g. a local server address, so the app doesn't reach the internet).
 if [ -z "${SMOKE_ARGS+x}" ] && [ -f haiku-app.env ]; then
 	SMOKE_ARGS=$(. ./haiku-app.env; printf '%s' "${SMOKE_ARGS:-}")
+fi
+if [ -z "${SMOKE_WINDOW:-}" ] && [ -f haiku-app.env ]; then
+	SMOKE_WINDOW=$(. ./haiku-app.env; printf '%s' "${SMOKE_WINDOW:-}")
+fi
+if [ -z "${SMOKE_PROCESS:-}" ] && [ -f haiku-app.env ]; then
+	SMOKE_PROCESS=$(. ./haiku-app.env; printf '%s' "${SMOKE_PROCESS:-}")
 fi
 OUT=$(mkdir -p "${2:-x11-smoke}" && cd "${2:-x11-smoke}" && pwd)
 DPY=:77
