@@ -60,7 +60,9 @@ Every session starts with:
 5. **README screenshots** from this release candidate: one per platform (Haiku/Renku,
    Linux; the CI Wayland smoke shot counts for Linux), each showing a real feature
    with real content, cropped to the window (`magick shot.png -crop WxH+X+Y +repage`), pointer
-   and tooltips out of the way. Save as `docs/screenshots/<platform>-<what>.png` and show them in
+   and tooltips out of the way (porting.md §7: closing stray windows and crash
+   dialogs, moving a PS/2 pointer away, cropping a Haiku window by its
+   frame). Save as `docs/screenshots/<platform>-<what>.png` and show them in
    `README.md` under `## Screenshots`, one-line caption each. Commit **before** the final build:
    the gate only accepts artifacts and evidence from HEAD, and wants 2+ screenshots.
 6. **Final build** of both from that HEAD into `dist/V/`; `check-artifact.sh` on each.

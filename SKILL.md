@@ -1,6 +1,6 @@
 ---
 name: beos-app-platforms
-description: Build, package, test and release BeOS-style apps (C++ against the Be/Haiku API) for Renku OS (the Haiku fork; .hpkg) and plain Linux through the Cosmoe library (AppImage). Covers one source tree for both, porting traps, Makefile platform detection, and a complete release pipeline: onboarding templates (packaging scripts, GitHub CI for the AppImage), building, testing every package in headless VirtualBox VMs (keyboard, mouse, screenshots, SSH) or under Xvfb, and a release gate that stops for a human before publishing. Use this whenever the task involves building, porting or packaging a Haiku-API app for any of these systems, cutting or verifying a release, booting or driving a test VM, checking that an app runs on Renku/Linux, or reporting a platform bug upstream, even if the user just says "test it on Renku", "make a release", "port it to Linux" or "check the AppImage".
+description: Build, package, test and release BeOS-style apps (C++ against the Be/Haiku API) for Renku OS (the Haiku fork; .hpkg) and plain Linux through the Cosmoe library (AppImage). Covers one source tree for both, porting traps, Makefile platform detection, and a complete release pipeline: onboarding templates (packaging scripts, GitHub CI for the AppImage), building, testing every package in headless VirtualBox VMs (keyboard, mouse, screenshots, SSH) or under Xvfb, and a release gate that stops for a human before publishing. Also covers porting an app from Qt, GTK or another toolkit to the native Haiku API, starting from reference screenshots of the original. Use this whenever the task involves building, porting or packaging a Haiku-API app for any of these systems, cutting or verifying a release, booting or driving a test VM, checking that an app runs on Renku/Linux, or reporting a platform bug upstream, even if the user just says "test it on Renku", "make a release", "port it to Linux", "port this to the native Haiku UI" or "check the AppImage".
 ---
 
 # Building and testing BeOS-style apps on Renku OS and Linux (Cosmoe)
@@ -18,6 +18,7 @@ Read the reference file for what you're doing:
   - `references/onboard.md`: set an app up once: `haiku-app.env`, the Makefile contract, copying `templates/`, the app's `release/test-plan.md`
   - `references/release-test.md`: test each artifact on its platform and write the evidence the gate reads; the two shared test VMs
 - `references/haiku-arm64.md`: the arm64 `.hpkg`: cross toolchain and sysroot on Linux, the QEMU test machine, what can't be built yet
+- **Porting an app to the native Haiku API** (from Qt, GTK, SDL…): `references/porting.md`: reference screenshots of the original first, structure, API traps, a vector icon, testing through `hey`, README screenshots
 - `references/renku.md`: Renku OS (and Haiku-family guests in general): VM, SSH, building and checking an `.hpkg`, tests
 - `references/cosmoe-linux.md`: Linux / Cosmoe: porting traps, the Makefile branch, AppImage bundling, CI, headless tests
 - `references/virtualbox.md`: driving any VM: scancodes, mouse via the VirtualBox SDK, screenshots, files in and out
@@ -27,7 +28,9 @@ Helper scripts in `scripts/` (read each script's header first):
 
 - `make-vm.sh NAME IMAGE [efi]`: create and boot a VM from a copy of an ISO or raw image
 - `vm.sh STEP…`: drive a VM (`VM=name`): `k:` scancodes, `t:` text, `m:` mouse, `w:` wait, `shot:` screenshot
-- `mouse.py`: absolute mouse input through `vboxapi` (needs the `virtualbox-sdk` package)
+- `mouse.py`: absolute mouse input through `vboxapi` (needs the `virtualbox-sdk` package and a USB-tablet pointer in the VM)
+- `hey-ui.sh`: shell functions to source in a Haiku guest that send mouse messages and commands to an app's views with `hey` (when clicks don't work)
+- `make-hvif-icon.py`: encodes a vector app icon (HVIF) as an .rdef resource, with an SVG preview
 - `xtest.sh STEP…`: drive a Cosmoe app under Xvfb (`APP=`, `APP_NAME=`; `start`, held clicks, keys, screenshots)
 - `serve-ssh-setup.sh`: one-time key-only SSH setup for a Haiku-family guest
 - `redactshot.py`: screenshot with private areas (account IDs, keys) blacked out before anything is written to disk
@@ -51,6 +54,7 @@ Helper scripts in `scripts/` (read each script's header first):
 - **Don't build release AppImages on an Arch/CachyOS host.** CachyOS packages are built for x86-64-v3 (AVX2), and rolling-release glibc is newer than most distros'. An AppImage built there crashes on older CPUs and won't start on Ubuntu 24.04. Build releases in CI on the oldest supported distro.
 - **Never capture or type the user's secrets.** Don't type passwords or account IDs into a VM: run the command and let the user answer the `sudo`/login prompt. If an app shows an account ID or similar, take every screenshot with `redactshot.py` and keep the private part out of the shot (see virtualbox.md).
 - **Report results honestly.** "Type-checked" isn't "ran", and a headless X11 run isn't a Wayland run. Keep the README's platform table and the release notes' "Tested" section in step with what was actually exercised.
+- **When porting an app, pull screenshots of the original before writing UI code**, and match its dimensions: find them in the project and package READMEs, on SourceForge/HaikuDepot/forums, or ask the user; if there are none, run the original in the VM and take them. Measure them (button and icon sizes, spacing, widths, number formats) and compare the native build side by side after every UI change (porting.md §1). Keep them in the scratchpad unless their licence allows committing them.
 - **Keep platform code contained.** Put the logic you can test anywhere in a portable core with no Haiku headers. Put platform differences in the Makefile's platform branches and behind a define such as `-DAPP_COSMOE`, never scattered through the code.
 
 ## One source tree, two targets

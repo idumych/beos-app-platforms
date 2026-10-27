@@ -8,7 +8,9 @@
 # TYPECHECK_CXXFLAGS.
 #
 #   sh tools/haiku-typecheck.sh [CACHE_DIR]     (default: ./.haiku-headers)
-# Prints "ok  <file>" or the compiler errors; exit 1 on any error.
+# Prints "ok  <file>" or the compiler errors (fatal ones too, e.g. a missing
+# header); exit 1 on any error. Run it with sh, not zsh: by hand in zsh,
+# an unquoted $INC is one argument and every include fails.
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 . "$ROOT/haiku-app.env"
@@ -42,7 +44,7 @@ for f in $TYPECHECK_SRCS; do
 	out=$(g++ -std=c++17 -Wall -Wno-cpp -Wno-multichar -fsyntax-only $INC \
 		${TYPECHECK_CXXFLAGS:-} \
 		-include "$CACHE/shim.h" "$ROOT/$f" 2>&1 \
-		| grep -E "^[^ ].*: (error|warning): " | grep -v "^$H/" | grep -v "redefined" || true)
+		| grep -E "^[^ ].*: (fatal error|error|warning): " | grep -v "^$H/" | grep -v "redefined" || true)
 	if [ -n "$out" ]; then echo "$out"; status=1; else echo "ok  $f"; fi
 done
 echo "typecheck: $n files, $( [ $status = 0 ] && echo PASS || echo FAIL )"

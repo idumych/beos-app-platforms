@@ -57,6 +57,31 @@ Coordinates are screenshot pixels. The script holds the button about 80 ms and m
   across into the submenu, hover the item, click.
 - **OCR picks the first matching word**, which may be in a status line rather than on the
   button ("download" vs "Download"). Check the y coordinate, or read the screenshot.
+- **Absolute clicks need a USB tablet.** `mouse.py` uses absolute events,
+  which a VM with `hidpointing="ps2mouse"` ignores: the pointer doesn't
+  move. Check with `VBoxManage showvminfo <vm> --machinereadable | grep
+  hidpointing`. On your own test VMs set `--mouse usbtablet` (powered off).
+  On the user's VM, don't change it without asking; instead:
+  - drive the app under test with `hey` (porting.md §6, `scripts/hey-ui.sh`);
+  - move the pointer out of a screenshot with relative events, which PS/2
+    accepts: `session.console.mouse.putMouseEvent(dx, dy, 0, 0, 0)` in a
+    few steps, through a `Shared` session lock;
+  - start programs with the keyboard. On Haiku, Ctrl+Esc did *not* open the
+    Deskbar menu (beta6); Tracker type-ahead does it: type the name of a
+    desktop icon (e.g. `Haiku`, the boot volume), Alt+O to open it, then
+    `system`, Alt+O, `apps`, Alt+O, `Terminal`, Alt+O. Alt+O is
+    `k:38` … `k:18,98` … `k:b8` with short pauses between.
+
+## Booting a VM that starts from the wrong device
+
+A VM may have a live ISO attached and boot it first. Without changing its
+boot order, press F12 (`k:58,d8` repeatedly right after `startvm`) for
+VirtualBox's boot menu and press `1` for the first hard disk. Choosing the
+disk volume from the *ISO's* Haiku boot loader can fail instead: a Haiku
+R1/beta6 install booted through a newer distro ISO's loader (Pirati del
+Frico rev10) panicked at once with "Divide Error Exception" in thread 0.
+After a panic that early, `VBoxManage controlvm <vm> poweroff` is safe;
+nothing is mounted yet.
 
 ## Files in and out
 
