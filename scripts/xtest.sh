@@ -25,7 +25,8 @@
 #
 # The app never sees the user's real session: WAYLAND_DISPLAY is removed,
 # COSMOE_BACKEND=x11, HOME is a throwaway, and xdg-open is replaced by a
-# stub that appends its arguments to $SCRATCH/xdg-open.log.
+# stub that appends its arguments to $SCRATCH/xdg-open.log. AppImageLauncher, if the
+# host has it, is told to run AppImages directly instead of offering to integrate them.
 SCRATCH=${SCRATCH:-/tmp/beos-xtest}
 HOME_DIR=${HOME_DIR:-$SCRATCH/home}
 APP=${APP:?set APP=<binary or AppImage>}
@@ -54,6 +55,7 @@ for step in "$@"; do
 		chmod +x "$SCRATCH/fakebin/xdg-open"
 		( env -u WAYLAND_DISPLAY -u XDG_CONFIG_HOME -u XDG_DATA_HOME \
 			PATH="$SCRATCH/fakebin:$PATH" HOME="$HOME_DIR" COSMOE_BACKEND=x11 \
+			APPIMAGELAUNCHER_DISABLE=1 \
 			${LIBDIR:+LD_LIBRARY_PATH="$LIBDIR"} \
 			$APP > "$SCRATCH/app.log" 2>&1 & )
 		sleep 7 ;;
@@ -63,7 +65,10 @@ for step in "$@"; do
 	ac:*) xdotool keydown alt; press "$x" "$y" 1; xdotool keyup alt ;;
 	d:*)
 		x2=$(echo "$v" | cut -d, -f3); y2=$(echo "$v" | cut -d, -f4)
-		xdotool mousemove "$x" "$y" mousedown 1; sleep 0.2
+		# Hover first, as press() does: Cosmoe (Hokku) ignored a press sent in
+		# the same xdotool call as the move, so the drag never started.
+		xdotool mousemove "$x" "$y"; sleep 0.3
+		xdotool mousedown 1; sleep 0.2
 		for i in 1 2 3 4 5 6 7 8; do
 			xdotool mousemove $((x + (x2 - x) * i / 8)) $((y + (y2 - y) * i / 8))
 			sleep 0.05
