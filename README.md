@@ -30,6 +30,7 @@ Claude loads it when a task involves building, porting, packaging, releasing or 
 - **Platform bugs go to Renku OS, Cosmoe bugs are fixed in Hokku**, never reported to Haiku or Cosmoe, which don't accept AI-generated contributions. File only after reproducing the bug in the platform's own code.
 - **Test the exact files that will be published**, built from one commit, and publish only after the gate passes and a human says so.
 - **Report honestly**: "type-checked" isn't "ran", a headless X11 run isn't a Wayland run, and a QEMU sound card isn't real hardware.
+- **Follow the [Haiku Human Interface Guidelines](https://www.haiku-os.org/community/getting-involved/designing/)** in every app, on Linux too: standard menus and shortcuts, sentence case, action-labelled alerts, remembered windows, icons to the Icon Guidelines. A port keeps the original's layout but takes Haiku's conventions. (Idea from Astra.)
 - **Never type or capture the user's secrets** in a VM; redact screenshots that could show them.
 
 ## Challenges it has worked through
@@ -121,6 +122,10 @@ The scripts have been used on Arch-based hosts (CachyOS) with VirtualBox 7.2 and
 - Renku build00064 hangs on every boot after the first; test VMs are recopied per boot until that's fixed.
 - Apps that need HaikuPorts libraries can't ship arm64 `.hpkg`s until HaikuPorts has an arm64 repository.
 - The JamesDSP node showed occasional dropouts in QEMU when the host was busy; whether the node is the cause hasn't been settled.
+
+## Credits
+
+- Astra, for the idea of holding every app to the Haiku Human Interface Guidelines (`references/hig.md`).
 
 ## Licence
 
