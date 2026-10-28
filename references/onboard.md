@@ -83,6 +83,9 @@ Then read the rest:
   differs. Keep anything that's app-specific and correct (extra files,
   MIME types), and move those values into `haiku-app.env`.
 
+Also check the UI against hig.md's checklist and list each deviation as a
+`FOUND` line. Fix the ones the user agrees to in their own commits.
+
 ## 2. haiku-app.env
 
 `cp $T/haiku-app.env .` and fill in every field. Each one is commented.

@@ -53,6 +53,11 @@ wide, 22 px icons on flat buttons and a labelled pop-up menu, where the Qt
 version had a 71 px tool box, 28 px bevelled buttons with 16 px icons and a
 compact spin field. The user caught it from a screenshot.
 
+Look and layout come from the original; conventions come from the Haiku
+HIG (hig.md): menu names and order, shortcuts, sentence case, `…`, alert
+buttons, settings and About windows. Note every such change in your
+report.
+
 1. **Collect** every screenshot of the original you can find, and keep the
    URLs:
    - the project's README (GitHub/GitLab), and the README of any fork that

@@ -51,6 +51,10 @@ display or a failed command can't produce PASS lines:
 A failing check stays FAIL with the reason. Find the cause and fix the app; don't retry until it
 passes by luck. Run scripts with `bash`: zsh aborts a whole command on an unmatched glob.
 
+Before the first release of an app, and whenever its menus or windows
+changed, go through the checklist at the end of hig.md on the Haiku build
+and note the result in the evidence file.
+
 ## Driving the UI
 
 1. `shot:<name>` (vm.sh or xtest.sh), then `ocr-find.sh $S/<name>.png <Label>` for X Y; `--text`

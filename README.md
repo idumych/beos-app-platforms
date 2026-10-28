@@ -89,6 +89,7 @@ Or, to share it with one project's collaborators, put it in that project's `.cla
 |---|---|
 | `SKILL.md` | Overview, ground rules, Makefile platform detection, platform cheat sheet, where to start |
 | `references/porting.md` | Porting to the native API: the existing-port check, reference screenshots, structure, API traps, icons, `hey`-driven tests |
+| `references/hig.md` | The Haiku Human Interface Guidelines as a checklist: menus, shortcuts, wording, alerts, windows, settings, controls, icons |
 | `references/media-kit.md` | Audio apps: a filter node between the mixer and the sound card, its traps, end-to-end audio tests |
 | `references/release.md` | The release procedure: phases, building, release notes, publishing |
 | `references/onboard.md` | Setting an app up for releases: `haiku-app.env`, the Makefile contract, templates, the app's test plan |
