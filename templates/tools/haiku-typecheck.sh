@@ -37,8 +37,19 @@ for d in "$H"/os "$H"/os/*/; do INC="$INC -I$d"; done
 for d in ${TYPECHECK_INCLUDES:-}; do INC="$INC -I$ROOT/$d"; done
 
 [ -n "${TYPECHECK_SRCS:-}" ] || { echo "haiku-typecheck: TYPECHECK_SRCS is empty" >&2; exit 1; }
+# from the app's root, so a glob ("src/ui/*.cpp") expands to every file:
+# a hand-kept list silently misses new files
+cd "$ROOT"
+# shellcheck disable=SC2086
+LISTED=$(ls -d $TYPECHECK_SRCS 2>/dev/null)
+for d in $(echo "$LISTED" | xargs -n1 dirname | sort -u); do
+	for c in "$d"/*.cpp; do
+		echo "$LISTED" | grep -qxF "$c" \
+			|| echo "haiku-typecheck: warning: $c is not in TYPECHECK_SRCS" >&2
+	done
+done
 status=0 n=0
-for f in $TYPECHECK_SRCS; do
+for f in $LISTED; do
 	n=$((n + 1))
 	# shellcheck disable=SC2086
 	out=$(g++ -std=c++17 -Wall -Wno-cpp -Wno-multichar -fsyntax-only $INC \

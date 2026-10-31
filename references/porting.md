@@ -172,8 +172,75 @@ pixels.
   full path. Write a `LeafName(ref)` helper (`BEntry::GetName`) on day one and
   use it for titles, save panels and messages, so the Linux build needs no
   changes later (cosmoe-linux.md § Porting traps).
+- **`BShape` is drawn from the pen's location**, not from the view's
+  origin: `MovePenTo(B_ORIGIN)` (inside `PushState`/`PopState`) before
+  `StrokeShape`/`FillShape`, or every shape lands offset by wherever the
+  last `DrawString` left the pen.
+- **Haiku has no dashed or dotted strokes** (only 8x8 `pattern`s, which
+  don't follow a line). Dashed, dotted and hashed pens have to be drawn by
+  hand: walk the outline (flatten curves first) and `StrokeLine` the dashes.
+- **`BMessage::GetInfo(type, index, char** name, …)`** takes a `char**`
+  on Haiku and a `const char**` on Dano/Zeta; guard it with
+  `#ifdef B_BEOS_VERSION_DANO` when the code has to build on both.
+- **A view the dialog builder made without a layout can't take layout
+  children:** `GetLayout() == NULL`, so `AddView` does nothing useful. Give it
+  one first (`view->SetLayout(new BGroupLayout(B_VERTICAL, 0))`), then
+  `GetLayout()->AddView(child)`.
+- **`BFilePanel` replies** add `"directory"` (entry_ref) and `"name"` to a
+  save panel's message, and `"refs"` to an open panel's. Reuse one panel per
+  kind (`SetPanelDirectory`, `SetMessage`, `SetTarget` before each `Show`).
+- **A `BMenuField` in a file panel can't be reached with Tab**, so keyboard-only
+  VM tests can't choose a file format there; test the save path through a
+  script command instead (§6).
+- **Several windows on one document:** each `BWindow` has its own thread, so
+  the shared document needs one lock taken in each window's `DispatchMessage`
+  (skip `B_QUIT_REQUESTED`: `Quit()` never returns). Undo history and the
+  modified flag belong to the document, not the view. A modal `BAlert` keeps
+  the lock, so the other windows wait while it's up.
+- **C++: `std::vector<uint8_t> bytes(size_t(size));` declares a function**
+  (the most vexing parse); it compiles until the variable is used. Write
+  `bytes(static_cast<size_t>(size))`.
 - The renku.md notes still apply: no `BAboutWindow` in beta6 headers (use a
   `BAlert`).
+
+## 4b. Porting from a decompiled original (no source)
+
+When the original exists only as a binary (BeOS apps decompiled with
+Ghidra), it is the reference for every behaviour, string and file format:
+
+- **Read the decompiled function before writing the port's**, and say in
+  the port's comment which function it follows (`TStyleManager::
+  DoExportStyles`). Keep a findings file (NOTES.md) per area: formats,
+  message codes, string ids, what was left out and why. Never copy the
+  decompiled code or the original's files into the public tree.
+- **Ghidra mistypes small integer arguments as addresses** in the ELF
+  header: `GetIndString(&s, 0x5e2, (BResources *)&Elf32_Ehdr.e_ident_data)`
+  means string index 5 (the field's offset: `e_ident_class` 4, `_data` 5,
+  `_version` 6). Check such indexes against the resource's strings.
+- **Strings and tables behind `PTR_DAT_…`:** map the virtual address to a
+  file offset with the ELF program headers (`p_vaddr`, `p_offset`, LOAD
+  segments), read the pointer there, and map it again to read the string.
+  That's how a `strtok` delimiter (`":,\n"`) or a table is recovered
+  exactly.
+- **Data files the original found on the system** (BeOS's
+  `/boot/optional/goodies/thesaurus` and `dictionary`) usually can't be had
+  any more. Recover the file format from the reader, then generate files
+  in that format from free data (WordNet: one source for both, licence must
+  travel with the files) with a converter in the app's `tools/`, and look for
+  them in the app's settings folder after the original's paths. Ask before
+  downloading the data; don't commit tens of megabytes of generated files.
+- **Round-trip tests are the oracle** when nothing can open the output:
+  every sample document's records written back byte for byte, every
+  translator's output read back by the port's own reader, and an
+  independent reader where one exists (antiword for .doc, xlrd for .xls,
+  ImageMagick for PNG).
+- **A README Status table as the progress record:** one row per feature
+  with its state (released / next / in progress / not yet), split rows
+  honestly when only part is done, and a progress bar generated from the
+  table. Name the bar's image after its counts (`progress-48-51-3.svg`,
+  old one deleted): GitHub serves README images through a cache that keeps
+  a path for minutes and ignores `?v=` query strings, so a fixed name shows
+  stale numbers after a push.
 
 ## 5. A vector icon without Icon-O-Matic
 
@@ -208,6 +275,17 @@ hey MyApp tool with tool="int32(5)"              # to the app itself
 hey MyApp set Frame of Window 0 to "BRect(150,110,646,512)"
 hey MyApp set Active of Window "Text" to true
 ```
+
+**Better still, build a test entry point into the app**: a `--do
+'<command>; <command>'` option run once the first window is up, and the same
+commands as a message (`'Grun'` with a `"script"` string) so a running app
+can be driven after a modal dialog blocked the first script:
+`hey MyApp "Grun" of Window 0 with script="selectall; send sf0R value=50"`.
+Commands like `click x y`, `drag x1 y1 x2 y2`, `key text{enter}`, `send ABCD
+field=value` (the window's command with fields), `window ABCD`, `save path`
+and state dumps (`selection`, `shapes`, `lines`, `caret`) make every feature
+testable without a mouse and checkable from the log. The app's stdout/stderr
+go to a log file: read the whole file, not just its tail.
 
 `scripts/hey-ui.sh` has these as shell functions (`down`, `move`, `up`,
 `drag`, `click`) to source in the guest. Name views (`BView("canvas", …)`)

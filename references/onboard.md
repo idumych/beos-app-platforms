@@ -109,6 +109,10 @@ the Haiku VM (`ssh haiku-b6-test ls /boot/system/data/licenses`), e.g.
 `GNU GPL v3`, `MIT`. If none matches, the package must ship the licence
 text under that name. `package create` reports the problem.
 
+- `TYPECHECK_SRCS` should be a glob (`"src/ui/*.cpp"`), not a hand-kept
+  list: a list misses files added later and the check still says PASS
+  (the script now warns about files left out of a listed folder).
+
 ## 3. Makefile contract
 
 If the app has no Makefile, start from `$T/Makefile` and fill in `SRCS`,

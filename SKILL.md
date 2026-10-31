@@ -18,7 +18,7 @@ Read the reference file for what you're doing:
   - `references/onboard.md`: set an app up once: `haiku-app.env`, the Makefile contract, copying `templates/`, the app's `release/test-plan.md`
   - `references/release-test.md`: test each artifact on its platform and write the evidence the gate reads; the two shared test VMs
 - `references/haiku-arm64.md`: the arm64 `.hpkg`: cross toolchain and sysroot on Linux, the QEMU test machine, what can't be built yet
-- **Porting an app to the native Haiku API** (from Qt, GTK, SDL…): `references/porting.md`: first a check that it hasn't been ported already, then reference screenshots of the original, structure, API traps, a vector icon, testing through `hey`, README screenshots
+- **Porting an app to the native Haiku API** (from Qt, GTK, SDL… or from a decompiled BeOS binary): `references/porting.md`: first a check that it hasn't been ported already, then reference screenshots of the original, structure, API traps, porting from a decompiled original (§4b: Ghidra's quirks, strings from the binary, missing system data files, round-trip tests, a README progress table), a vector icon, testing through `hey` and the app's own `--do` script hooks, README screenshots
 - **Every app follows the Haiku HIG** (designing, porting, onboarding, reviewing or releasing UI): `references/hig.md`: the checkable rules (menus and their order, reserved shortcuts, sentence case and `…`, alerts, windows, settings, controls, icons) and a review checklist
 - `references/renku.md`: Renku OS (and Haiku-family guests in general): VM (VirtualBox or QEMU), the boot hang, SSH, building on Renku when `haiku_devel` lags, checking an `.hpkg`, tests
 - `references/media-kit.md`: audio apps: a filter node between the system mixer and the sound card, the mixer auto-start trap, end-to-end audio tests from QEMU's capture of the guest's sound card
@@ -63,6 +63,27 @@ Helper scripts in `scripts/` (read each script's header first):
 - **When porting an app, pull screenshots of the original before writing UI code**, and match its dimensions: find them in the project and package READMEs, on SourceForge/HaikuDepot/forums, or ask the user; if there are none, run the original in the VM and take them. Measure them (button and icon sizes, spacing, widths, number formats) and compare the native build side by side after every UI change (porting.md §1). Keep them in the scratchpad unless their licence allows committing them.
 - **Follow the Haiku Human Interface Guidelines** (https://www.haiku-os.org/community/getting-involved/designing/) in every app, on Linux too: standard menus and shortcuts through `B_COMMAND_KEY`, sentence case, `…` only before a window that asks for input, action-labelled alerts, remembered window sizes, settings in `B_USER_SETTINGS_DIRECTORY`, an HVIF icon to the Icon Guidelines. A port keeps the original's layout and sizes but takes Haiku's conventions. Check `references/hig.md` during UI work and before a release, and report deviations instead of skipping them.
 - **Keep platform code contained.** Put the logic you can test anywhere in a portable core with no Haiku headers. Put platform differences in the Makefile's platform branches and behind a define such as `-DAPP_COSMOE`, never scattered through the code.
+
+## Large ports: several agents at once
+
+A big port (an office suite) goes faster split across a few agents, each
+owning one README Status row:
+
+- **A git worktree and branch per agent** (`git worktree add ../app-<name>
+  -b <name>`), with symlinks for what isn't in git (the original's files,
+  the decompiled tree, the VM folder). Agents never touch the main tree or
+  each other's; you merge each branch when it reports, run the host suite
+  and the Haiku type check on the merge, and push.
+- **Give each agent a whole row and files of its own**; shared files
+  (the main view, the README, the progress bar) will conflict, so keep their
+  changes there to small hooks and resolve README conflicts by keeping each
+  row's honest state, then regenerate the bar.
+- **The shared test VM needs a lock** (virtualbox.md § Several agents).
+- **Hand a finished agent its next row at once** (resume it with the new
+  task rather than starting a fresh one), and respect the user's cap on how
+  many run.
+- Agents' reports are claims: check one or two of their VM checks yourself
+  on the merged build.
 
 ## One source tree, two targets
 

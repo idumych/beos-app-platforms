@@ -72,6 +72,23 @@ Coordinates are screenshot pixels. The script holds the button about 80 ms and m
     `system`, Alt+O, `apps`, Alt+O, `Terminal`, Alt+O. Alt+O is
     `k:38` … `k:18,98` … `k:b8` with short pauses between.
 
+## Driving dialogs with the keyboard only (PS/2 guests)
+
+What worked on Haiku R1/beta6 dialogs and file panels:
+
+- **Enter** presses the default button; **Escape** cancels; **Alt+A**
+  (`k:38,1e,9e,b8`) selects the text field's contents before typing over it.
+- In a `BListView` / `BOutlineListView`, **Down** (`k:e0,50,e0,d0`) moves the
+  selection and **Space** (`k:39,b9`) toggles a check box item, if the app
+  handles it (a `BMessageFilter` on `B_KEY_DOWN`).
+- In an open panel, typing a name's first letters selects the file; Enter
+  opens it. In a save panel the name field has focus with the default name
+  selected: type the name, Enter.
+- **Tab can't reach a `BMenuField`** (a save panel's format menu): use a
+  script command in the app for anything behind one (porting.md §6).
+- **A stray key can start Haiku's Screenshot app** (it sat over the app in
+  later shots). Close it with `hey Screenshot quit`, or kill its team.
+
 ## Booting a VM that starts from the wrong device
 
 A VM may have a live ISO attached and boot it first. Without changing its
@@ -86,6 +103,11 @@ nothing is mounted yet.
 ## Files in and out
 
 1. **Best:** SSH (Haiku-family; see renku.md), then `scp` or `tar | ssh`.
+   For a guest path with spaces (`~/config/settings/My App/`), `scp`'s
+   escaping fails silently (the file goes elsewhere); use
+   `tar -C dir -cf - files | ssh guest 'tar -C "/path with spaces" -xf -'`.
+   Its "time stamp … in the future" warnings only mean the guest clock is
+   behind.
 2. **Published files:** `curl` the GitHub release URL from inside the guest. This is also the truest install test.
 3. **From the host:** run `python3 -m http.server PORT --bind <LAN-IP>` in a directory holding only what's needed, and stop it afterwards. Find the LAN IP with `ip route get 1.1.1.1 | grep -oP 'src \K\S+'`. **127.0.0.1 doesn't work:** VirtualBox 7 NAT blocks guest-to-host loopback (`10.0.2.2` gives connection refused). The host's ufw allows this, because NAT traffic comes from the host itself.
 4. **Tiny files without networking:** `echo <base64> | base64 -d | tar -xz` typed with `t:`.
@@ -124,6 +146,20 @@ When the user asks you to test in a VM they're using:
   media_server hang happens under QEMU (renku.md § When it hangs). The audio driver setting
   doesn't change it.
 - **Waiting for a guest:** the harness blocks chains of `sleep`. Poll screenshots in an `until` loop instead, e.g. until a pixel or the colour count says the desktop is up (`PIL.Image.open(shot).getcolors(1<<20)`).
+
+## Several agents sharing one test VM
+
+When parallel agents (or sessions) test in the same VM:
+
+- **One lock:** `until mkdir /tmp/<session>/vm.lock 2>/dev/null; do sleep 20;
+  done` before any VM step, `rmdir` after. Keep the locked span short
+  (build, run, screenshot).
+- **One build directory per agent** in the guest (`/Data/app/<agent>`), never
+  the shared one; the screen is shared, so take the screenshot inside the
+  lock.
+- After the agents' branches are merged, rebuild the merged tree in the
+  shared directory and repeat a couple of their checks there: merges can
+  undo behaviour that each branch had right.
 
 ## Hygiene
 
