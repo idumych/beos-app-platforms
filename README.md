@@ -98,10 +98,12 @@ Or, to share it with one project's collaborators, put it in that project's `.cla
 | `references/renku.md` | Renku OS and Haiku guests: VMs (VirtualBox or QEMU), the boot hang, SSH, building on Renku, the `.hpkg`, CI builds, arm64 status, bug reports |
 | `references/haiku-arm64.md` | The arm64 `.hpkg`: cross toolchain and sysroot, the QEMU test machine, what can't be built yet |
 | `references/cosmoe-linux.md` | Hokku/Cosmoe: using and fixing Hokku, porting traps, the AppImage, CI, headless X11 and Wayland tests |
+| `references/beos.md` | The original on BeOS 5 in VirtualBox, for checking a BeOS app's port against it: installing BeOS 5.0.3, the video mode, files in on a CD image, driving it without SSH, measuring the port against it |
 | `references/virtualbox.md` | Driving VMs: scancodes, mouse, screenshots, files, hangs |
 | `references/theming.md` | System looks: window decorators, control looks, colours and fonts; one look for many Renku/Haiku builds; cross-building and deploying; comparing against reference art |
 | `references/folio.md` | Worked example: an app set up with the templates |
 | `scripts/make-vm.sh`, `scripts/vm.sh`, `scripts/mouse.py` | VirtualBox: create a VM from an image; keys, text, mouse, screenshots |
+| `scripts/beos-mouse.py`, `scripts/beos-terminal.sh` | A BeOS 5 guest: the PS/2 pointer steered from screenshots; a Terminal opened through the Be menu |
 | `scripts/qemu-vm.sh`, `scripts/qmp-input.py` | QEMU/KVM x86_64 VM: create, start, keys, pointer, screenshots, the guest's audio to a WAV file |
 | `scripts/haiku-arm64-vm.sh` | A Haiku arm64 nightly in QEMU |
 | `scripts/serve-ssh-setup.sh` | One-time key-only SSH setup for a Haiku-family guest |

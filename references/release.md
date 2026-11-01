@@ -97,6 +97,11 @@ report "not found" for your runs.
   `/boot/system/data/licenses`.
 - No VM of your own? renku.md § Build an hpkg in GitHub CI. The gate still wants the test on
   Haiku R1/beta6.
+- **haiku-b6-test full?** (`df /boot`: a few MB free, shared with other apps' builds that
+  aren't yours to delete.) Build in another Haiku R1/beta6 VM you may use, e.g. the app's
+  dev VM with a data disk, and only install and test in haiku-b6-test. If the app's
+  `TEST_CMD` runs `tests/`, copy `tests/` too: a sync script that sends only `src/` makes
+  `build-hpkg.sh` fail at `make test`.
 
 ## CI: the AppImage
 
@@ -216,6 +221,14 @@ fails partway, don't delete or recreate anything: report the state and ask.
 - `eval $(xdotool getwindowgeometry --shell …)` set `X`, which was the evidence file in the
   test script's `chk` helper, so later checks were written to files named `239` and `240`
   in the project root. Prefix its variables (release-test.md § Driving the UI).
+- **Other workflows attach files on a tag.** A `deb.yml` left over from a dropped platform
+  attached two untested `.deb`s to v0.2.0 and v0.2.1 on the tag push, outside `SHA256SUMS`;
+  nobody noticed for a release. After the tag's CI runs finish, list the release's assets
+  (`gh release view vV --json assets -q '.assets[].name'`), compare with what was tested,
+  and remove workflows for platforms no longer shipped.
+- **Code changes during a release need the human's go-ahead.** A fix slipped in after the
+  artifacts were tested ("the save bug, quickly") was broken, invalidated the evidence, and
+  angered the user mid-release. Note the bug, ship what was tested or ask.
 - On the slower arm64 runner, a window mapped while Openbox was still starting stayed unmapped.
   Start the app only once the WM answers EWMH queries (`xdotool get_desktop`); `x11-smoke.sh`
   does, and do the same when you start Xvfb + Openbox by hand.

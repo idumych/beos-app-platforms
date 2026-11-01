@@ -64,7 +64,12 @@ and note the result in the evidence file.
      the app's own labels (a menu name such as "Effects") for `launch`;
    - **small text on a large black root window** (Xvfb): OCR a crop of the app's window too;
    - **text along the top edge of a crop** (a menu bar in a window crop): OCR the whole screen
-     too. Concatenating both readings into `<p>-screen.txt` is fine; both are the same shot.
+     too. Concatenating both readings into `<p>-screen.txt` is fine; both are the same shot;
+   - **a short title or status line at screen scale**: crop just that strip and enlarge it 3×
+     (`magick shot.png -crop 300x22+X+Y +repage -resize 300% title.png`) before OCR. Haiku's
+     "resume-haiku" tab and Linux's "Saved …" status line read only that way;
+   - **a word OCR splits** ("Pan" read as "P"): an empty `read X Y` then clicks at ","
+     and nothing happens. Check the coordinates came back, or use known ones and say so.
 2. Click: `m:click,X,Y` in a VM, `c:X,Y` under Xvfb. Menu items: hover first (virtualbox.md).
    A VM with a PS/2 pointer takes no absolute clicks: drive the app with `hey`
    (porting.md § 6, `hey-ui.sh`) and say so in the release notes' "Tested" section.
@@ -72,13 +77,20 @@ and note the result in the evidence file.
    and Xvfb `k:ctrl+a`, but only if the app has no Select all menu item of its own: Ctrl/Alt+A
    then selects the whole document (EasyPaint), and the digits are appended to the field.
    Clear such a field with `k:End` and `k:BackSpace` instead.
-4. Screenshot after every action and confirm it worked before the next one. Name shots
+4. **Know what the first launch shows.** An app that opens a "New Document" chooser when
+   started without a document keeps it focused: Escape and Command+Q may not reach the app
+   (Gobe Productive kept running), and the next launch with a document then opens it in that
+   instance behind an untitled window that takes the typing. Close the chooser, check the
+   process is gone (`ps`/`pgrep`), and only then launch with the test document; verify the
+   window's title in every later shot, and check the saved file's content (`strings`), not
+   only OCR of the window, for type-save-reopen.
+5. Screenshot after every action and confirm it worked before the next one. Name shots
    `<p>-<step>.png`. Quote the OCR word *and* a log or file line in the evidence: a screenshot
    of the wrong window has passed for success before.
-5. Window positions: `eval $(xdotool getwindowgeometry --shell $W | sed 's/^/G_/')`. Without
+6. Window positions: `eval $(xdotool getwindowgeometry --shell $W | sed 's/^/G_/')`. Without
    the prefix it sets `X`, `Y`, `WIDTH`, `HEIGHT`, `SCREEN` and `WINDOW`, and `X` is the
    evidence file in the `chk` helper above.
-6. Every part of a PASS condition is a check. "The red rectangle and the text" needs the
+7. Every part of a PASS condition is a check. "The red rectangle and the text" needs the
    text in OCR *and* a red pixel on the rectangle's edge (PIL `getpixel`; sample a few pixels
    around the expected line, which may be one off).
 
@@ -188,4 +200,5 @@ app's feature checks were not run on arm64: say so in the release notes.
 
 In each VM, `curl -fsSLO https://github.com/$GITHUB_REPO/releases/download/v$V/<file>`, check its
 `sha256sum` against `SHA256SUMS`, then repeat `install`, `attrs`, `launch` and one feature
-check. Write the results to `$E/<p>-release.txt` in the same format, `artifact: <the URL>`.
+check. A downloaded AppImage isn't executable: `chmod +x` it, or `xtest.sh start` gives a
+black screen and an empty log. Write the results to `$E/<p>-release.txt` in the same format, `artifact: <the URL>`.

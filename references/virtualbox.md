@@ -72,6 +72,9 @@ Coordinates are screenshot pixels. The script holds the button about 80 ms and m
     `system`, Alt+O, `apps`, Alt+O, `Terminal`, Alt+O. Alt+O is
     `k:38` … `k:18,98` … `k:b8` with short pauses between.
 
+**BeOS 5 guests** have no USB tablet driver: `scripts/beos-mouse.py` steers the PS/2 pointer
+by finding it in screenshots (beos.md § 4).
+
 ## Driving dialogs with the keyboard only (PS/2 guests)
 
 What worked on Haiku R1/beta6 dialogs and file panels:
@@ -164,6 +167,7 @@ When parallel agents (or sessions) test in the same VM:
 ## Hygiene
 
 - Shut a guest down from inside (`sync; shutdown` on Haiku-family) before changing VM settings, so installed packages are kept.
-- Never `pkill -f <word>` when the word is in your own command line: it kills the shell running it. Use `pkill -x <name>`.
+- Never `pkill -f <word>` when the word is in your own command line: it kills the shell running it. Use `pkill -x <name>`, or kill by PID (`for p in $(pgrep -x Xvfb); do kill $p; done` rather than `pkill -f 'Xvfb :97'`).
+- **`kex_exchange_identification: banner line 0: Not allowed at this time`** is the guest's OpenSSH refusing the host for a while (PerSourcePenalties) after quick or failed connections. A retry loop every 30 s keeps it refused indefinitely, and a failed login (an `IdentityFile` given as a relative path, run from the wrong directory) starts it again. Stop connecting, wait 10 minutes in one background `sleep`, then try once from the right directory. A guest resumed from saved state hours later stayed refused however long it waited: shut it down from inside (`VBoxManage controlvm <vm> acpipowerbutton` works on Haiku) and start it cold.
 - Don't leave a background loop that starts VMs running when you switch to QEMU: a running VirtualBox VM makes KVM fail ("entry failed, hardware error 0x0").
 - To remove a test VM: `VBoxManage controlvm <vm> poweroff; VBoxManage unregistervm <vm> --delete`. Ask the user first; they may want to keep it.

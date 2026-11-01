@@ -71,7 +71,10 @@ report.
    licence allows republishing them.
 2. **If there are none, make them:** install the original in the test VM
    (`pkgman install` the old .hpkg, or build it), open a typical document and
-   screenshot the window, its dialogs and its menus.
+   screenshot the window, its dialogs and its menus. **A BeOS original runs
+   on BeOS 5, not Haiku** (a 64-bit Haiku can't load gcc2 binaries, and
+   Haiku would draw it differently anyway): set up the BeOS VM in
+   `beos.md` and take the reference shots there.
 3. **Measure** with PIL rather than by eye: scan a row or column for border
    pixels and write the numbers down. Example, from the EasyPaint reference:
 
@@ -229,6 +232,24 @@ Ghidra), it is the reference for every behaviour, string and file format:
   travel with the files) with a converter in the app's `tools/`, and look for
   them in the app's settings folder after the original's paths. Ask before
   downloading the data; don't commit tens of megabytes of generated files.
+- **The layout function isn't the whole layout.** It places each element
+  at a point; the element's *size* is often set in its subclass's
+  constructor (`TToolBarElement`: `(x + 28) - 1` wide and tall), and
+  where a bar sits relative to the others is in the window's code. A port
+  whose coordinates match the layout function to the pixel can still be
+  visibly wrong: compare it with the original running on BeOS
+  (`beos.md` §6).
+- **Packed colours in gcc2 code:** an `rgb_color` passed by value shows up
+  as one 32-bit constant, little-endian on x86: `SetHighColor(0xffff0000)`
+  is bytes 00 00 ff ff = red 0, green 0, **blue 255**, alpha 255, not
+  red. Greys (`0xffd8d8d8`) are the same either way, so the mistake hides
+  until an asymmetric one: grep the decompiled code for `0xff[0-9a-f]{6}`
+  arguments whose three colour bytes differ and check each. (Byte-by-byte
+  stores into an `rgb_color` local are unambiguous.)
+- **"Shrink the font until it fits"** in the original measures with
+  `GetHeight()` (ascent + descent). Don't approximate it with
+  `size * 1.2` (BeOS's Bitstream fonts' proportion): Haiku's and Linux's
+  fonts are taller and the text overflows its box.
 - **Round-trip tests are the oracle** when nothing can open the output:
   every sample document's records written back byte for byte, every
   translator's output read back by the port's own reader, and an
