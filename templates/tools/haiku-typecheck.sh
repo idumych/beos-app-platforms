@@ -20,7 +20,13 @@ if [ ! -d "$CACHE/haiku/headers/os" ]; then
 	git clone -q --depth 1 --filter=blob:none --sparse \
 		https://github.com/haiku/haiku.git "$CACHE/haiku"
 	git -C "$CACHE/haiku" sparse-checkout set headers/os headers/posix \
-		headers/config headers/build/config_headers headers/libs
+		headers/config headers/build/config_headers headers/libs \
+		headers/private/interface
+fi
+# headers/private/interface: R1/beta6 has some public-to-be classes there
+# (BAboutWindow), so apps include <private/interface/...> for beta6.
+if [ ! -d "$CACHE/haiku/headers/private/interface" ]; then
+	git -C "$CACHE/haiku" sparse-checkout add headers/private/interface
 fi
 H=$CACHE/haiku/headers
 
