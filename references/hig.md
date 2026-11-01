@@ -58,7 +58,7 @@ Shortcuts are only for common tasks. Command is the main modifier. Option means 
 
 ## Branding (ch. 7) and icons
 
-- About window: name, version, author, copyright, an optional one-line licence. No system information, no tabs. Closes with Cmd+W. Use `BAboutWindow` where the headers have it. Renku's beta6 headers don't (renku.md), so build a small window with the same contents.
+- About window: name, version, author, copyright, an optional one-line licence. No system information, no tabs. Closes with Cmd+W. Use `BAboutWindow`: on R1/beta6 it needs the private header (renku.md § Header differences).
 - Every app ships a vector (HVIF) icon. A poor icon is worse than the default one. Icon rules, from the Icon Guidelines:
   - Designed for 32×32 and still readable at 16×16. Only detail that is visible at 32×32. Use LOD to drop fine parts at small sizes.
   - Flat front view or BeOS isometric (floor edges at 2:1). Verticals stay vertical.

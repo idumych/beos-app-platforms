@@ -110,7 +110,17 @@ installed and ran on Renku nightly build00055.
 
 **Header differences:** `tools/haiku-typecheck.sh` checks against Haiku's *current* headers,
 so it misses things beta6 doesn't have: `AboutWindow.h` (BAboutWindow) is not in beta6's
-public headers — use a BAlert. CI on beta6 is the real check.
+public headers, but the class is in libbe and `haiku_devel` ships its private header, so
+use it with a fallback (PowerPlay does):
+
+    #if __has_include(<AboutWindow.h>)
+    #	include <AboutWindow.h>
+    #else
+    #	include <private/interface/AboutWindow.h>
+    #endif
+
+Renku is making the header public (RenkuOS/Source branch `public-about-window`). CI on
+beta6 is the real check.
 
 **pkgman on Renku** may say "A reboot is necessary to complete the installation process"
 when a dependency updates system packages (e.g. ICU); `shutdown -r` and reconnect.
