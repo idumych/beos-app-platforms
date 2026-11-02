@@ -49,7 +49,9 @@ else ifeq ($(UNAME),Haiku)
 else ifneq ($(wildcard $(COSMOE_ROOT)/include/os/app/Application.h),)
   # Plain Linux with Cosmoe (the Haiku API as a library on X11/Wayland)
   PLATFORM    := Cosmoe
-  COSMOE_DIRS := config os os/app os/game os/interface os/kernel os/locale \
+  # Haiku's compiler also searches os/add-ons/graphics (Accelerant.h)
+  COSMOE_DIRS := config os os/add-ons/graphics os/app os/game os/interface \
+                 os/kernel os/locale \
                  os/media os/net os/storage os/support os/translation \
                  os/be_apps/Tracker private/interface private/shared \
                  private/support posix
@@ -59,8 +61,10 @@ else ifneq ($(wildcard $(COSMOE_ROOT)/include/os/app/Application.h),)
   # libbe finds Cosmoe's add-ons and data next to itself, so the AppImage
   # (bin/App + lib/) works wherever it is mounted.
   COSMOE_RPATH ?= $$ORIGIN/../lib
+  # --export-dynamic, as Haiku links apps: archived objects (replicants)
+  # are instantiated by looking up Class::Instantiate() in the app.
   LIBS        := -L$(COSMOE_ROOT)/lib -lbe -ltracker $(APP_LIBS) \
-                 -Wl,-rpath,'$(COSMOE_RPATH)'
+                 -Wl,-rpath,'$(COSMOE_RPATH)' -Wl,--export-dynamic
   INSTALL_DIR := $(HOME)/.local/bin
   # Cosmoe reads resources from a .cosmoe_rsrc section linked into the app
   EXTRA_OBJS  := obj/$(NAME).rsrc.o
