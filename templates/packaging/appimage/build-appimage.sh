@@ -82,6 +82,13 @@ for lib in $LIBS; do
 	# under the name the binary asks for (e.g. libbnetapi.so.0), not a symlink
 	install -m 0755 "$(readlink -f "$CROOT/lib/$lib")" "$APPDIR/usr/lib/$lib"
 done
+# TrayExport: Deskbar items (replicants) in the desktop's own tray when
+# Hokku's Deskbar isn't running. BDeskbar starts it from beside libbe.
+EXTRA_EXECUTABLES=""
+if [ -x "$CROOT/bin/TrayExport" ]; then
+	install -m 0755 "$CROOT/bin/TrayExport" "$APPDIR/usr/bin/TrayExport"
+	EXTRA_EXECUTABLES="--executable $APPDIR/usr/bin/TrayExport"
+fi
 mkdir -p "$APPDIR/usr/lib/addons/Translators"
 cp -a "$CROOT/lib/addons/control_look" "$APPDIR/usr/lib/addons/"
 if [ -z "${APPIMAGE_TRANSLATORS+set}" ]; then
@@ -164,6 +171,8 @@ done
 for so in $(find "$APPDIR/usr/lib/addons" -name '*.so'); do
 	"$PATCHELF" --set-rpath '$ORIGIN/../..' "$so"
 done
+[ ! -e "$APPDIR/usr/bin/TrayExport" ] \
+	|| "$PATCHELF" --set-rpath '$ORIGIN/../lib' "$APPDIR/usr/bin/TrayExport"
 DEPS_ONLY=""
 for so in $(find "$APPDIR/usr/lib/addons" -name '*.so') \
 		"$APPDIR/usr/lib/libcosmoe-x11.so" "$APPDIR/usr/lib/libcosmoe-wayland.so"; do
@@ -171,7 +180,7 @@ for so in $(find "$APPDIR/usr/lib/addons" -name '*.so') \
 done
 # shellcheck disable=SC2086
 NO_STRIP=1 LD_LIBRARY_PATH="$APPDIR/usr/lib" "$LDROOT/AppRun" --appdir "$APPDIR" \
-	--executable "$APPDIR/usr/bin/$APP_NAME" $DEPS_ONLY \
+	--executable "$APPDIR/usr/bin/$APP_NAME" $EXTRA_EXECUTABLES $DEPS_ONLY \
 	--desktop-file "$GEN/$APP_CMD.desktop" \
 	--icon-file "$GEN/$APP_CMD.png" \
 	--custom-apprun "$GEN/AppRun"
