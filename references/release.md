@@ -93,10 +93,28 @@ report "not found" for your runs.
 - `find … -exec touch` fixes the guest's clock skew ("time stamp in the future").
 - Haiku-only compile errors: look in the guest's headers
   (`ssh haiku-b6-test grep -rn <Symbol> /boot/system/develop/headers/os`), not your memory.
+- **Name the package after its command.** `check-artifact.sh`'s `bin-link` wants
+  `bin/<APP_CMD>` and its `name` check `<APP_CMD>-<V>-<REVISION>-x86_64.hpkg`, so a package
+  called `reactionary` whose command was `Themes` failed it. Renaming the package to the
+  command (`powertheme`, with the app `apps/PowerTheme` and Deskbar entry "Power Theme") passes
+  it; don't add a second command or weaken the check.
+- **A rename before publishing** (project, app, package): change the app's signature, its
+  settings and data folder names (move an old settings folder on first run, so a saved state
+  survives), the Deskbar link, the install/uninstall scripts (remove the old names), then
+  `gh repo rename` (GitHub redirects the old URL) and `git remote set-url`, rebuild and retest
+  the package from the renamed HEAD.
 - `package create` complaining about a licence: `LICENSE_NAME` isn't a file in
   `/boot/system/data/licenses`.
 - No VM of your own? renku.md § Build an hpkg in GitHub CI. The gate still wants the test on
   Haiku R1/beta6.
+- **haiku-b6-test full?** It has a second volume, `/Data`, with gigabytes free: build there
+  (`git archive … | ssh haiku-b6-test 'tar x -C /Data/<app>'`) and set `TMPDIR=/Data/<app>/tmp`
+  for `make` and `package create` too, or gcc's temporary files fill `/boot` ("No space left
+  on device" writing `/tmp/cc*.s`). `pkgman install` still needs room on `/boot` (the package,
+  plus a state backup under `/boot/system/packages/administrative/` holding the replaced
+  version: remove only the ones your own installs made). `check-artifact.sh` copies the package
+  to the guest's `/tmp`: pass another Haiku-family VM as its third argument
+  (`check-artifact.sh hpkg FILE renku-test`).
 - **haiku-b6-test full?** (`df /boot`: a few MB free, shared with other apps' builds that
   aren't yours to delete.) Build in another Haiku R1/beta6 VM you may use, e.g. the app's
   dev VM with a data disk, and only install and test in haiku-b6-test. If the app's
