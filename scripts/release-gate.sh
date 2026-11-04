@@ -41,6 +41,7 @@ if git check-ignore -q "$D/x" 2>/dev/null; then ok dist-ignored; else bad dist-i
 
 # version everywhere it lives
 MA=$(echo "$V" | cut -d. -f1) MI=$(echo "$V" | cut -d. -f2) MN=$(echo "$V" | cut -d. -f3)
+MN=${MN:-0}    # a two-part version such as 0.4 has minor 0 in the .rdef
 if tr -d ' \t\n' < "$RDEF" | grep -q "major=$MA,middle=$MI,minor=$MN,"; then ok "version rdef"; else bad "version rdef" "$RDEF app_version is not $V"; fi
 if grep -qF "\"$APP_SIG\"" "$RDEF"; then ok "signature rdef"; else bad "signature rdef" "$RDEF app_signature is not $APP_SIG"; fi
 if [ -s "$D/release-notes.md" ] && grep -q '^### Tested' "$D/release-notes.md"; then ok release-notes; else bad release-notes "$D/release-notes.md missing or has no '### Tested' section"; fi
