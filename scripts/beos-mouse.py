@@ -48,6 +48,28 @@ HAND = [
 	".......#ooooo....",
 ]
 HOT = (3, 1)	# the fingertip, in HAND
+# the I-beam it becomes over text (a document, a text view), with the white
+# round it: its hot spot is the middle of the stem
+IBEAM = ["o##o##o", "oo###oo"] + ["ooo#ooo"] * 12 + ["oo###oo", "o##o##o"]
+IBEAM_HOT = (3, 8)
+# Gobe Productive's table resize pointers (MICN 401 and 400, hot spot 7, 7)
+RESIZE_ROW = ["........#.......", ".......###......", "......#####.....", ".....#######....",
+	"........#.......", "........#.......", "........#.......", "################",
+	"################", "........#.......", "........#.......", "........#.......",
+	".....#######....", "......#####.....", ".......###......", "........#......."]
+RESIZE_COL = [".......##......."] * 4 + ["...#...##...#...", "..##...##...##..",
+	".###...##...###.", "################", ".###...##...###.", "..##...##...##..",
+	"...#...##...#..."] + [".......##......."] * 5
+RESIZE_HOT = (7, 7)
+# Gobe's open hand over a shape or frame to move (MICN 1103, hot spot 3, 3)
+MOVEHAND = ['.......##.......', '...##.#oo###....', '..#oo##oo#oo#...', '..#oo##oo#oo#.#.', '...#oo#oo#oo##o#', '...#oo#oo#oo#oo#', '.##o#ooooooo#oo#', '#oo##oooooooooo#', '#ooo#ooooooooo#.', '.#oooooooooooo#.', '..#ooooooooooo#.', '..#oooooooooo#..', '...#ooooooooo#..', '....#ooooooo#...', '.....#oooooo#...', '.....#oooooo#...']
+# the spreadsheet's cross over cells (its MICN 1000, hot spot 7, 7)
+SSCROSS = [".....#####......", ".....#ooo##.....", ".....#ooo##.....", ".....#ooo##.....",
+	".....#ooo##.....", "######ooo######.", "#ooooo###ooooo##", "#ooooo#.#ooooo##",
+	"#ooooo###ooooo##", "######ooo#######", ".#####ooo#######", ".....#ooo##.....",
+	".....#ooo##.....", ".....#ooo##.....", ".....######.....", "......#####....."]
+# its frame handle pointer (MICN 1100, hot spot 5, 5), drawn as a cross
+HANDLE = [".....#....."] * 5 + ["###########"] + [".....#....."] * 5
 
 mgr = VirtualBoxManager(None, None)
 vb = mgr.getVirtualBox()
@@ -76,16 +98,53 @@ def locate():
 			if all((p[x + cx, y + cy] < 40) if black else (p[x + cx, y + cy] > 215)
 					for cx, cy, black in cells):
 				return x + HOT[0], y + HOT[1]
+	beam = [(x, y, c == "#") for y, row in enumerate(IBEAM) for x, c in enumerate(row)]
+	for y in range(H - len(IBEAM)):
+		for x in range(W - len(IBEAM[0])):
+			if p[x + 1, y] >= 40 or p[x + 3, y + 5] >= 40:
+				continue
+			# (every black pixel; most of the white round it, a line or
+			# text may cross it)
+			if not all(p[x + cx, y + cy] < 40 for cx, cy, black in beam if black):
+				continue
+			light = [p[x + cx, y + cy] > 200 for cx, cy, black in beam if not black]
+			if sum(light) >= 0.85 * len(light):
+				return x + IBEAM_HOT[0], y + IBEAM_HOT[1]
+	# the resize pointers: every black pixel, most of the rest light
+	for pattern, hot in ((RESIZE_ROW, (7, 7)), (RESIZE_COL, (7, 7)), (SSCROSS, (7, 7)), (MOVEHAND, (3, 3))):
+		cells = [(x, y, c == "#") for y, row in enumerate(pattern) for x, c in enumerate(row)]
+		first = next((cx, cy) for cx, cy, black in cells if black)
+		for y in range(H - 16):
+			for x in range(W - 16):
+				if p[x + first[0], y + first[1]] >= 40:
+					continue
+				if not all(p[x + cx, y + cy] < 40 for cx, cy, black in cells if black):
+					continue
+				light = [p[x + cx, y + cy] > 200 for cx, cy, black in cells if not black]
+				if sum(light) >= 0.8 * len(light):
+					return x + hot[0], y + hot[1]
+	cells = [(x, y, c == "#") for y, row in enumerate(HANDLE) for x, c in enumerate(row)]
+	for y in range(H - 11):
+		for x in range(W - 11):
+			if p[x + 5, y] >= 40 or p[x, y + 5] >= 40:
+				continue
+			if not all(p[x + cx, y + cy] < 40 for cx, cy, black in cells if black):
+				continue
+			light = [p[x + cx, y + cy] > 200 for cx, cy, black in cells if not black]
+			if sum(light) >= 0.6 * len(light):
+				return x + 5, y + 5
 	return None
 
 
 def go(x, y, buttons=0):
 	"""steered to x, y: moved, found on screen, corrected"""
-	for _ in range(12):
+	nudges = [(-150, -120), (40, 30), (-40, -30), (90, 0), (0, 90), (-90, 0)]
+	for attempt in range(12):
 		at = locate()
 		if at is None:
-			# over something that hides or changes it: nudged, looked for again
-			rel(15, 15, buttons)
+			# over something that hides or changes it (or in a corner, out
+			# of sight): nudged back toward the middle, looked for again
+			rel(*nudges[attempt % len(nudges)], buttons)
 			time.sleep(0.25)
 			continue
 		dx, dy = x - at[0], y - at[1]
