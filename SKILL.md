@@ -37,6 +37,7 @@ Helper scripts in `scripts/` (read each script's header first):
 - `beos-mouse.py`: mouse input for a BeOS 5 guest (PS/2 only): finds the hand pointer in screenshots and steers it there; `beos-terminal.sh` opens a Terminal in it
 - `hey-ui.sh`: shell functions to source in a Haiku guest that send mouse messages and commands to an app's views with `hey` (when clicks don't work)
 - `make-hvif-icon.py`: encodes a vector app icon (HVIF) as an .rdef resource, with an SVG preview
+- `wayland-input/build.sh`: builds `vptr` (virtual pointer for headless sway) and `ftouch` (touch through a nested KWin) for driving apps on headless Wayland (cosmoe-linux.md)
 - `xtest.sh STEP…`: drive a Cosmoe app under Xvfb (`APP=`, `APP_NAME=`; `start`, held clicks, keys, screenshots)
 - `serve-ssh-setup.sh`: one-time key-only SSH setup for a Haiku-family guest
 - `redactshot.py`: screenshot with private areas (account IDs, keys) blacked out before anything is written to disk

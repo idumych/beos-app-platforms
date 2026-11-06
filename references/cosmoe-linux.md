@@ -36,7 +36,13 @@ Rows marked **Fixed in Hokku** need nothing in the app. The others are still ope
 | `BScreen::GetBitmap()`/`ReadBitmap()` | Upstream: missing | **Fixed in Hokku** on X11; Wayland returns `B_UNSUPPORTED`. `Frame()` now ends on the last pixel, as on Haiku |
 | `BDirectory(const node_ref*)`; `FindInt64("node", &ref.node)`, `FindInt32("device", &ref.device)` | Upstream: missing; don't compile (`ino_t`/`dev_t` are `unsigned long`) | **Fixed in Hokku** (node found as `watch_node()` does; `BMessage` overloads) |
 | `debugger()`, `ASSERT`'s `_debuggerAssert()`, `_debugPrintf()` | Upstream: `debugger()` silent; the helpers missing | **Fixed in Hokku**: stderr plus a backtrace. The release gate fails on `debugger` in the app log, so each one is a real bug to fix |
-| `BNotification::Send()` | Upstream: `system("notify-send \"…\"")`, so quotes or `$(…)` in the text run commands; blocks the caller | **Fixed in Hokku** (arguments to a detached `notify-send`, no shell) |
+| `BNotification::Send()` | Upstream: `system("notify-send \"…\"")`, so quotes or `$(…)` in the text run commands; blocks the caller | **Fixed in Hokku**: to Hokku's `notification_server` when it runs (the Deskbar starts it), as on Haiku, else a detached `notify-send` with no shell. Hokku extension: `AddAction(label, message[, target])` buttons; guard it with `#ifdef APP_COSMOE` as Haiku lacks it |
+| `BShelf`, replicants dropped on a shelf | Upstream: empty stubs, `AddReplicant()` always fails | **Fixed in Hokku** (Haiku's implementation) |
+| `BRoster::GetAppInfo()`/`IsRunning()` for an app with no window; `BMessenger::IsValid()` for another app | Upstream: not found / false | **Fixed in Hokku** |
+| `BDeskbar::Frame()`, `AddItem()` | Upstream: empty frame; `B_NAME_NOT_FOUND` for any error | **Fixed in Hokku** (500 ms timeout if no Deskbar runs) |
+| Touch screens on Wayland | Upstream: a finger does nothing in an app | **Fixed in Hokku** (tap = click, drag = held button, 0.6 s hold = right click; `HOKKU_TOUCH_DEBUG=1`) |
+| Dragging from a menu into a submenu the compositor flipped or slid; first click after the pointer enters a window | Upstream: the submenu never highlights; the click lands at a stale position | **Fixed in Hokku** |
+| Window frames on Wayland from an AppImage or a staged install | Upstream: frame images looked for only at the configured prefix (or `COSMOE_DATA_DIR`), so no client-side frame where the compositor draws none (GNOME, the Gonx frame) | **Fixed in Hokku** (found next to `libbe.so`). With an older Hokku, set `COSMOE_DATA_DIR=<prefix>/share/cosmoe` |
 | Opening any menu from a `BMenuBar` | Upstream: the tracking thread reads the menu bar unlocked (a Windows deadlock workaround), with `debugger("Looper must be locked")` each time | **Fixed in Hokku** (brief lock for the geometry reads). The release test should open a menu, since nothing else exercises this |
 | Writing pixels through `Bits()` of a `B_BITMAP_ACCEPTS_VIEWS` bitmap (a canvas the app fills, blits or clears itself) | Upstream: lost. Its views draw into a separate surface; `DrawBitmap()` draws that surface, and the next `Bits()` copied it back over the writes, so a canvas cleared to white showed as transparent | **Fixed in Hokku** (the bitmap tracks which copy changed; test `src/tests/kits/interface/bbitmap/BitmapBitsSyncTest`) |
 | Alpha of a `B_BITMAP_ACCEPTS_VIEWS` bitmap after its views drew | Copying the surface back to `Bits()` makes every pixel opaque | Open: keep translucent pixels in a bitmap without views, or fix it in Hokku when an app needs it |
@@ -139,3 +145,15 @@ APP=/path/App-x86_64.AppImage APP_NAME=App sh scripts/xtest.sh start shot:b    #
 - **First run:** test both a **fresh HOME** and a reused one, and both the **mounted** and the extracted AppImage. The v0.9.0 translator failure only showed on a fresh HOME with the mounted image.
 
 Wayland is testable headlessly with **sway** on wlroots' headless backend (`WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_LIBINPUT_NO_DEVICES=1 sway -c <conf>`) and `grim` for screenshots: `templates/packaging/appimage/wayland-smoke.sh`, run by `appimage.yml`. Headless **Weston** doesn't work: it offers no `wl_seat`, and a Cosmoe app opens its window and then exits with status 127. Still not testable headlessly: drag-and-drop from a Linux file manager (XDND). Use a desktop Linux VM (see virtualbox.md) or ask the user to try on their own session.
+
+**Input on headless Wayland.** Headless sway has a seat with no pointer (`swaymsg -t get_seats` shows capabilities 0), so `swaymsg … cursor` does nothing and apps get no clicks. `scripts/wayland-input/build.sh OUTDIR` builds two small clients (usage in its header):
+
+- `vptr`: a wlroots virtual pointer for sway. Start it *before* the app, so the seat has a pointer when the app connects. Keep `XDG_RUNTIME_DIR` short: socket paths must fit in 108 bytes.
+- `ftouch`: KWin's fake input, for **touch**, which sway can't fake. Run a nested headless KWin (`kwin_wayland --virtual --socket NAME --width 1280 --height 800 --no-lockscreen`, on a private `dbus-daemon --session`) and authorize `ftouch` with a `.desktop` file on `XDG_DATA_DIRS` (see the header). Screenshot it with `spectacle -b -n -f -o FILE`. Its fake *pointer* didn't open Cosmoe menus, so test mouse behaviour under sway.
+
+Hokku's desktop apps in a test session:
+
+- **Run Hokku's own apps from a staged install** (`meson install --destdir`), with `HOME` a throwaway folder so the user's settings stay untouched.
+- **Only one Deskbar runs at a time, across displays too.** Stop the user's Deskbar before starting one in a nested session, and start it again afterwards.
+- **Stop test processes by saved PID**, not `pkill -f PATTERN`: in zsh the pattern matches the shell's own command line and kills it (exit 144).
+- **Menus in a nested session**: if submenus don't respond to hover there, confirm in the user's real session before calling it a Hokku bug.
