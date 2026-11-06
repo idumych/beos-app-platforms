@@ -24,6 +24,9 @@ Hokku/Cosmoe has no app_server decorators or control-look add-ons: a look is Ren
   otherwise shadow the public kit headers for system includes.
 - Derive from **`Decorator`, not `TabDecorator`**, if the tab geometry is your own:
   `TabDecorator` re-runs its private `_LayoutTabItems` and moves your buttons back.
+- **Every decorator with a title bar across the window must also draw a BeOS-style tab**, so that
+  Power Theme's *BeOS-style tabs* option (`powertheme --beos-tabs=on`) works with it. A decorator
+  that already draws a narrow tab, as Tidy's does, needs nothing. See § BeOS-style tabs.
 - `_GetFootprint` is the region you draw. `Window::_UpdateContentRegion` subtracts it from the
   content, so a footprint that bites into the content's corners gives rounded inner corners.
   Anything you paint outside it (a shadow, a flap) is clipped or left behind as garbage.
@@ -36,6 +39,43 @@ Hokku/Cosmoe has no app_server decorators or control-look add-ons: a look is Ren
   `fContentRegionValid`, so windows already open keep the old decorator's content region (square
   corners, gaps) until resized or reopened. A reboot clears it. Not an add-on bug; report to
   RenkuOS/Source only with the user's go-ahead.
+
+## BeOS-style tabs
+
+Part of porting any full-width title bar, not an extra: a port isn't finished until the option
+works with it. Reactionary, Expose and Platinum in Power Theme are the examples to copy.
+
+- **The setting:** the add-on's constructor checks that `PowerTheme/beos tabs` exists in
+  `B_USER_SETTINGS_DIRECTORY` and passes the answer to each decorator it allocates. Add-ons read it
+  as they load, and Power Theme reloads the decorator when it changes.
+- **Register it:** add the decorator's file name to `draws_beos_tabs()` in Power Theme's
+  `src/themes/Theme.cpp`. Until then the option is off for that theme's window, and the command
+  still reports it as on, with no effect.
+- **The frame:** with tabs on, the frame gets a real top edge, as a window with no title has. Its
+  top corners are square where a tab reaches them.
+- **The tab:** it sits on the frame, overlapping its top edge so they join. A lone tab is as wide
+  as its title and buttons, and `_TabWidth()` must leave room for anything the look shows beside the
+  title, such as stripes. A stack's tabs share the window's width.
+- **Buttons:** close on the left, zoom on the right, no minimize. Lay these out from the tab rather
+  than the window, because a bar's button order often differs.
+- **Sliding:** `_SetTabLocation()` clamps the location to the window, and `_SetSettings()` restores
+  it, keeping a bar's location for when it becomes a tab again. Re-clamp on every layout, so that a
+  slid tab stays on a window that has been narrowed.
+- **Keep the look:** the tab keeps the bar's shading, corners and buttons. Reuse the code that
+  draws the bar, and take away what only makes sense across a window, such as a recess along its
+  bottom.
+
+Test all of it, in each mode the theme has, reopening windows first (see the `ReloadDecor` bug
+above):
+
+- on and off, with the status line and a screenshot of each;
+- shift-drag the tab from its title (start on the text: a narrow tab has little room between its
+  buttons, and a drag that starts on zoom zooms the window);
+- narrow a window with a slid tab, and check the tab stays on it;
+- click close and zoom on the tab;
+- move a window, and check the tab goes with it;
+- stack two windows if you can. Synthesised keys didn't start a stack in a VM, so if you can't, say
+  it's untested.
 
 ## Control look
 
