@@ -1,8 +1,11 @@
 # Theming Renku OS and Haiku: decorators, control looks, colours, fonts
 
 Learned building [Gonx](https://github.com/idumych/gonx), a full look (window decorator, control
-look, colours, fonts) installed by a zip with `install.sh`. A look has four parts, and each is
-switched separately:
+look, colours, fonts) installed by a zip with `install.sh`, and
+[Power Theme](https://github.com/idumych/power-theme), a theme manager with several looks
+(Windows ME, ZETA-style Smoke, Flat, Gonx), Theme Manager themes and freedesktop icon themes,
+shipped as an `.hpkg` that builds its add-ons on the user's system. A look has four parts, and
+each is switched separately:
 
 | Part | What it is | Loaded by | Switch with |
 |---|---|---|---|
@@ -22,8 +25,30 @@ Hokku/Cosmoe has no app_server decorators or control-look add-ons: a look is Ren
   that in every install script and README.
 - Include app_server's directories with **`-iquote`, not `-I`**: its `Window.h`, `View.h` etc.
   otherwise shadow the public kit headers for system includes.
-- Derive from **`Decorator`, not `TabDecorator`**, if the tab geometry is your own:
-  `TabDecorator` re-runs its private `_LayoutTabItems` and moves your buttons back.
+- Derive from **`Decorator`, not `TabDecorator`**, if the tab geometry is your own (a title bar
+  across the window): `TabDecorator` re-runs its private `_LayoutTabItems` and moves your
+  buttons back.
+- For a **BeOS-style sliding tab, derive from `TabDecorator`** (sliding, stacking and resizing
+  come free) and adjust around it (Power Theme's `src/smoke`):
+  - Tab height: override `_DoTabLayout()`, call the base, then move each `tabRect.top` (and
+    `closeRect`/`zoomRect` by the same delta), rebuild `fTitleBarRect` and call
+    `_CalculateTabsRegion()`. Later layouts (`_ResizeBy`, `_SetTabLocation`, `_SetFocus`) only
+    move tabs sideways or place buttons from the tab's top, so the height sticks.
+  - Button rects: override `_GetButtonSizeAndOffset()` with sizes that don't depend on the
+    `tabRect` passed in (it is the pre-adjustment one).
+  - Border width: override `_DoLayout()` entirely (it's short) to set `fBorderWidth`,
+    `fResizeKnobSize` (the footprint's content-corner knob is `fResizeKnobSize - fBorderWidth`)
+    and the border rects, then call `_DoTabLayout()`.
+  - A tab that flows into the frame: `tabRect.bottom` is the frame's top row, so the rows below
+    it belong to the frame. Paint that part of the tab from `_DrawFrame()` too, or a partial
+    redraw of the frame paints frame lines across the tab.
+  - `GetComponentColors` isn't virtual in `TabDecorator` (only in `DefaultDecorator`).
+  - **Never `ConstrainClippingRegion()`** in a decorator to redraw under a button: it replaces
+    the window's own clipping, and `NULL` lets you paint over other windows. Refill the button
+    rect with the same gradient instead.
+- Colours derived from the tab colour: darken by **scaling** (`colour × (brightness − d) /
+  brightness`), not by subtracting `d` per channel. On a grey both give the same, but
+  subtracting turns orange (#FF6A13) into a saturated red edge instead of a dark one.
 - **Every decorator with a title bar across the window must also draw a BeOS-style tab**, so that
   Power Theme's *BeOS-style tabs* option (`powertheme --beos-tabs=on`) works with it. A decorator
   that already draws a narrow tab, as Tidy's does, needs nothing. See § BeOS-style tabs.
@@ -80,7 +105,12 @@ above):
 ## Control look
 
 - Subclass the private **`BPrivate::HaikuControlLook`** (libbe) and override only what you
-  change; export `extern "C" BControlLook* instantiate_control_look(image_id)`.
+  change; export `extern "C" BControlLook* instantiate_control_look(image_id)`. Because it
+  subclasses a private class, a control look is tied to the system build too, like a decorator
+  (its vtable must match libbe's): build it on the target with the decorators.
+- A `BMenuField`'s pop-up marker room is on the right (`kPopUpIndicatorWidth`, 13px); text
+  starts after the left item margin. A marker drawn on the left overlaps the label unless you
+  also swap the margins (see below).
 - **Keep Haiku's inset contracts** or labels and layouts shift: `DrawButtonFrame` insets the rect
   by 2px (5px for the default button), `DrawButtonBackground` by 1px, and callers lay out the
   label in what's left. A different border thickness must still consume the same inset.
@@ -99,6 +129,9 @@ above):
   (below), so set fonts first and then measure.
 - Small outlined arrows look cleaner rasterized pixel by pixel than with `FillTriangle` +
   `StrokeTriangle` at 5–9px.
+- `BStringView` status lines under `B_AUTO_UPDATE_SIZE_LIMITS` widen the window to fit a long
+  message, even with an explicit min width of 0 and truncation: keep status messages short and
+  put the long text in a log view.
 - A demo app with every control in one window (buttons default/normal/disabled, check boxes,
   radio buttons, menu fields and pop-ups, slider, scroll bars, tabs, text control, list, status
   bar, box) is the fastest way to compare against reference art.
@@ -123,16 +156,39 @@ above):
   `ClientMemoryAllocator.h` (`AreaOffset` uint32 vs size_t, unused by a decorator).
 - So: bundle the exact private headers the add-ons need (Gonx: 39 app_server/libbe headers plus
   15 FreeType headers, with a NOTICE for MIT/FTL) in the source, and **build on the target**.
-  `haiku_devel` + `gcc` + `make` are enough; no source tree.
-- Ship a zip, not an `.hpkg`: an `.hpkg` of a private-ABI add-on must pin the exact `haiku`
-  version (`requires haiku == <ver>`) and breaks at the next update. The zip's `install.sh`
-  builds when a compiler is present, else uses prebuilt files and warns if `prebuilt/BUILT_FOR`
-  differs from the running `haiku` version. It installs to `~/config/non-packaged` (no package
-  database), refuses if the package version is installed, and `uninstall.sh` reverts first.
+  `haiku_devel` + `gcc` + `rc`/`xres` are enough; no source tree, no make.
+- **Ship the add-ons as source, not binaries.** An `.hpkg` with prebuilt private-ABI add-ons
+  must pin the exact `haiku` version (`requires haiku == <ver>`) and blocks or breaks at the next
+  update. Power Theme's package instead holds the app, the themes, the add-ons' sources and a
+  build script (`src/themes/build-decorators.sh`); its "Build add-ons…" window runs the script,
+  shows `STEP <percent> <what>` lines in a progress bar and the rest in a log, and installs into
+  `~/config/non-packaged/add-ons`. The package itself then needs only `haiku >= <oldest>` and
+  works on every build. (Gonx's older way: a zip whose `install.sh` builds when a compiler is
+  present, else uses prebuilt files with a `BUILT_FOR` warning.)
+- **Headers for the running build**, when the bundled ones are from another:
+  - The revision is in the haiku package's name: `/boot/system/packages/haiku-r1~beta6_hrev60072_339-1-x86_64.hpkg`
+    is `hrev60072+339` (`git describe` style: 339 commits past the tag).
+  - Renku: tags and commits on `github.com/RenkuOS/Source`. Haiku: the GitHub mirror has no
+    `hrev` tags; take the tag's commit from `git ls-remote https://review.haiku-os.org/haiku
+    refs/tags/hrevN` (Gerrit doesn't support `--filter` or `--shallow-exclude`), and fetch
+    commits from `github.com/haiku/haiku`.
+  - Every commit on Haiku's `master` has its own hrev tag, so `hrevN+M` is on a **release
+    branch**: try the one the version names (`r1~beta6` → `r1beta6`) before `master`, or you
+    find a different commit M past the tag on master.
+  - `git fetch --filter=tree:0 origin <branch>` (commits only: ~23 MB for Haiku, seconds), then
+    binary-search the `--first-parent` line for the commit where `git rev-list --count C ^tag`
+    equals M, then `git checkout <commit> -- <the header paths>` fetches just those files.
+  - Cache them (`~/config/cache` is **read-only on Renku**; use `~/config/settings/<App>`), and
+    stop if they can't be fetched: add-ons built against another build's headers take
+    app_server down later, when a theme is applied, not at build time.
+  - Haiku R1/beta6 has no git by default: the build offers `pkgman install gcc haiku_devel git`
+    for what's missing.
 - **Never overwrite a loaded add-on in place**: apps that have it mapped crash. Copy to
   `<file>.new` and `mv` over it.
 - After switching, check app_server survived: its team id (`ps | grep app_server`) must be
-  unchanged.
+  unchanged. A rebuilt decorator that is in use only loads after `setdecor Default; setdecor
+  <Name>`: do that, check the team id, and set the file aside (`<Name>.failed`) if app_server
+  restarted.
 
 ## Cross-building on Linux
 
@@ -156,6 +212,15 @@ sysroot copied from one running Renku VM (`tools/sync-sysroot.sh <ssh-host>` in 
   A reboot can stall on the same prompt; click *Kill application*.
 - Address windows by title in `hey`, not `Window 0`: Tracker's window 0 is the Desktop, and
   resizing it breaks the desktop until Tracker restarts.
+- Haiku's `ps` prints more columns after the path: match with `awk '$1 ~ /PowerTheme$/'`, not
+  `grep 'PowerTheme$'`. There is no `pkill`; kill by the team id from `ps`. `hey <App> quit` can
+  hang on a confirmation (Screen preferences): run it under `timeout` or `kill` instead.
+- Screenshots after `--restart-tracker`: Tracker reopens the windows it had (home, disks), which
+  can show the test VM's private folder names. Close them with `hey Tracker quit Window <title>`
+  and open a neutral folder (`/boot/system/apps`).
+- A single-window app keeps its old binary running: after installing a new build, kill the
+  running instance, or a new launch only activates the old window. Never `scp` over a running
+  app's binary (it crashes); copy to `.new` and `mv`.
 - Matching reference art: upscale low-resolution mockups (`waifu2x-ncnn-vulkan`) to read
   detail, but measure sizes on the originals. Crop the same region of the VM screenshot at the
   same scale and compare side by side after every change.
@@ -164,5 +229,10 @@ sysroot copied from one running Renku VM (`tools/sync-sysroot.sh <ssh-host>` in 
 
 Mockups, screenshots and videos of old systems (BeOS, Dano, Zeta) are fine as visual references.
 Don't use leaked BeOS/Dano/Zeta source code, even "abandonware" archives: it's copyrighted and
-taints Haiku-family work. Credit artwork you copy (Gonx copies Momo's IceWM glyphs pixel for
+taints Haiku-family work. The same goes for **binaries and artwork**: don't extract, convert or
+ship ZETA's decorators, bitmaps or theme files, even when the user calls them abandonware.
+Recreate the look instead: run the original in a VM (beos.md § ZETA), screenshot it, measure
+pixel by pixel (frame lines, gradient end points, glyph masks), derive colours from the system
+colours as offsets, and write a new add-on (Power Theme's Smoke). Keep the screenshots out of the
+repository. Credit the original look by name and say nothing of it is included. Credit artwork you copy (Gonx copies Momo's IceWM glyphs pixel for
 pixel, credited in the README).

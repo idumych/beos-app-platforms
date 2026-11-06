@@ -172,3 +172,47 @@ porting.md has the decompiling side):
 Keep the screenshots of the original out of the public tree unless the
 user asks for them there (a README comparison, as Gobe Productive's
 "Next to the original" section, is the user's call).
+
+## 7. ZETA as a reference (looks, not apps)
+
+ZETA 1.21 (yellowTAB/magnussoft, 2006) is the reference for ZETA's looks:
+its decorators (Smoke, Cupertino, Menlo, Redmond, Seattle, yellowTAB…),
+its controls and its Themes preferences. Use it only to look at and
+screenshot; its CD says its programs are copyrighted and may not be
+copied, so nothing from it goes into a project (theming.md § Copyright).
+Power Theme's Smoke decorator and control look were drawn from these
+screenshots.
+
+- **The VM:** VirtualBox, IDE (PIIX3) controller, PS/2 mouse and
+  keyboard, no hardware virtualization needed. The archive.org image
+  (`zeta.zip`: `zetaboot.img`, `zetacd.img`) is a **live CD**: merge its
+  tracks into one `.bin` with a `.cue` and boot that; nothing persists
+  between boots except what you write to its RAM-backed home.
+- **Colour:** it boots in a low-colour mode. Hold **Space** right after
+  the BIOS for its boot menu, choose the fail-safe video mode
+  **1024×768×16**, then continue. There are no 32-bit modes. Script it
+  (cold boot, Space, select, continue) because it's needed every boot.
+- **Input:** `scripts/beos-mouse.py` works (its hand pointer is BeOS's);
+  clicks are sometimes dropped: screenshot and retry. The German live CD
+  uses a German keymap and can't save another (`keymap -l` fails with
+  "unable to rename temp file"), so translate text before
+  `keyboardputstring`: y↔z, `/`→`&`, `-`→`/`, `_`→`?`, `*`→`}`, `"`→`@`,
+  `;`→`<`, `:`→`>`, `=`→`)`, `(`→`*`, `)`→`(`, `&`→`^`, `?`→`_`,
+  `+`→`]`. `|` can't be typed: avoid pipes and `>` redirection, or use
+  scancode 56 for `<`.
+- **A Terminal:** ZETA menu → Software → Systemprogramme → Terminal.
+  Preferences: ZETA menu → Einstellungen → Aussehen (Appearance), whose
+  Themes tab takes ~40 s to fill.
+- **Applying a Theme Manager theme in ZETA itself** (to see a decorator
+  with its intended colours and fonts): put the theme folders on a CD
+  image, attach it as the IDE secondary slave, and copy them into
+  `~/config/settings/UIThemes` (home is writable on the live CD). They
+  show in Aussehen → Themes next to the system ones from
+  `/boot/beos/etc/UIThemes`; select, **Anwenden** (Apply).
+- **Measuring:** 16-bit colour quantizes (B4 reads as B1, white as F8FC);
+  take colours as offsets from the theme's own colour settings (e.g. the
+  tab is the tab colour shading −1 to +27, the frame's light line +39),
+  so the recreation follows any colour scheme. Capture active and
+  inactive windows, a document window's resize corner, every control
+  checked, unchecked and disabled, scroll bars that can and can't scroll,
+  tabs and an open menu.
