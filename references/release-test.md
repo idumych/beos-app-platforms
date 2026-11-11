@@ -137,8 +137,13 @@ Haiku starts sshd by itself (`uname -a` shows `hrev59866`).
     F=${APP_CMD}-${V}-${REVISION}-x86_64.hpkg
     ssh haiku-b6-test 'uname -a'                                       # -> os:
     ssh haiku-b6-test "pkgman uninstall -y $APP_CMD" 2>&1 | tail -1    # "not installed" is fine
+    # One name per uninstall: given several, pkgman refuses them all if any isn't installed
+    # (an old package name in HPKG_REPLACES, say), and the old package stays.
     scp $D/$F haiku-b6-test:/tmp/ && ssh haiku-b6-test "pkgman install -y /tmp/$F" 2>&1 | tail -3
     ssh haiku-b6-test "ls /boot/system/packages | grep '^$APP_CMD-'"   # install: must show $F
+    ssh haiku-b6-test "sha256sum /boot/system/packages/$F"             # install: must equal $D/$F's
+    # The name alone isn't proof: installing a rebuilt package of the same version over one
+    # still installed changes nothing, and the test then runs the old build.
     ssh haiku-b6-test "catattr BEOS:APP_SIG /boot/system/$APP_PATH"   # attrs
     # fresh state: delete what the test plan names
     ssh haiku-b6-test "(/boot/system/$APP_PATH > /tmp/app.log 2>&1 &)"; sleep 5
