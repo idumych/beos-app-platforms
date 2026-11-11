@@ -112,7 +112,7 @@ Keep `CXXFLAGS` additive (`override CXXFLAGS +=`) so packagers can pass hardenin
 | Install | `pkgman install ./x.hpkg` | AppImage: `chmod +x`, run |
 | System apps | `/boot/system/apps` | inside the AppImage |
 | Attributes | BFS, indexable; `listattr`, `query` | `user.*` xattrs, plus `user.COSMOE:ATTR_TYPES` |
-| Queries | yes (`mkindex` / `fs_create_index`) | no |
+| Queries | yes (`mkindex` / `fs_create_index`) | upstream no; Hokku: yes, from a list of the files with attributes, or by walking the home folder |
 | Trash | `/boot/trash` + `_trk/original_path` attr | `~/.local/share/Trash/{files,info}` |
 | `B_USER_SETTINGS_DIRECTORY` | `~/config/settings` | `~/.config/cosmoe` |
 | Node monitor | Haiku ints, leaf `name` | **full-path** `name`; upstream Cosmoe: only `watch_path()` works and fields are dev_t/ino_t-typed (both fixed in Hokku) |
