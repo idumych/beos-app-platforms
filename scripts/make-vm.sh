@@ -26,7 +26,7 @@ else
 fi
 VBoxManage createvm --name "$NAME" --ostype "$OSTYPE" --register >/dev/null
 VBoxManage modifyvm "$NAME" --firmware "$FIRMWARE" --memory 4096 --cpus 4 \
-	--graphicscontroller "$GFX" --vram 64 --nic1 nat --audio-enabled off \
+	--graphicscontroller "$GFX" --vram 64 --nic1 nat --nictype1 82540EM --audio-enabled off \
 	--mouse usbtablet --usbohci on --ioapic on
 VBoxManage storagectl "$NAME" --name SATA --add sata --portcount 2
 VBoxManage storageattach "$NAME" --storagectl SATA --port 0 --device 0 \
