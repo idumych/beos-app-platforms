@@ -17,7 +17,7 @@ Read the reference file for what you're doing:
 - **Releasing** (any of "release X", "build X for all platforms", "set up X for packaging"): `references/release.md` first. It runs the phases and points to the rest:
   - `references/onboard.md`: set an app up once: `haiku-app.env`, the Makefile contract, copying `templates/`, the app's `release/test-plan.md`
   - `references/release-test.md`: test each artifact on its platform and write the evidence the gate reads; the two shared test VMs
-- `references/haiku-arm64.md`: the arm64 `.hpkg`: cross toolchain and sysroot on Linux, the QEMU test machine, what can't be built yet
+- `references/haiku-arm64.md`: the arm64 `.hpkg`: cross toolchain, sysroot and static libraries on Linux, what Haiku arm64 lacks, the QEMU test machine
 - **Porting an app to the native Haiku API** (from Qt, GTK, SDL… or from a decompiled BeOS binary): `references/porting.md`: first a check that it hasn't been ported already, then reference screenshots of the original, structure, API traps, porting from a decompiled original (§4b: Ghidra's quirks, strings from the binary, missing system data files, round-trip tests, a README progress table), a vector icon, testing through `hey` and the app's own `--do` script hooks, README screenshots
 - **Porting a BeOS app: compare it with the original running on BeOS 5**, not Haiku: `references/beos.md`: getting BeOS 5.0.3 and installing it in VirtualBox, the warm-reset panic, the 1024×768 VESA mode, files in on a CD image, driving it without SSH (a steered PS/2 mouse, menus by keyboard, a Terminal), launching the original, and measuring the port against it; § 7: ZETA 1.21 as a reference for its looks (live CD, 1024×768×16 boot mode, German keymap, applying Theme Manager themes in it)
 - **Every app follows the Haiku HIG** (designing, porting, onboarding, reviewing or releasing UI): `references/hig.md`: the checkable rules (menus and their order, reserved shortcuts, sentence case and `…`, alerts, windows, settings, controls, icons) and a review checklist
@@ -43,11 +43,11 @@ Helper scripts in `scripts/` (read each script's header first):
 - `redactshot.py`: screenshot with private areas (account IDs, keys) blacked out before anything is written to disk
 - `ocr-find.sh SHOT [WORD|--text]`: a screenshot as text, with click positions
 - `tone.cpp` (built in the guest) and `sine-check.py`: play a sine through the system mixer and measure its level and dropouts in the captured WAV
-- `haiku-arm64-vm.sh`: a Haiku arm64 nightly in QEMU (start, screenshots, pointer and keys over QMP, copy files in); `qmp-input.py` is its pointer helper
+- `haiku-arm64-vm.sh`: a Haiku arm64 test machine in QEMU (a 20 GB disk to install onto, start, clean shutdown, screenshots, pointer and keys over QMP, copy files in); `qmp-input.py` is its pointer helper
 - `check-artifact.sh hpkg|appimage FILE`: static checks of a package
 - `release-gate.sh`: the final yes/no for a release, from raw evidence only
 
-`templates/` holds what onboarding copies into an app: `haiku-app.env`, a two-platform `Makefile`, `packaging/` (hpkg, AppImage with Hokku, Wayland smoke test), `.github/workflows/` (`appimage.yml`, `test.yml`) and `tools/` (Haiku type-check, Haiku arm64 sysroot).
+`templates/` holds what onboarding copies into an app: `haiku-app.env`, a two-platform `Makefile`, `packaging/` (hpkg, AppImage with Hokku, Wayland smoke test), `.github/workflows/` (`appimage.yml`, `test.yml`) and `tools/` (Haiku type-check, Haiku arm64 sysroot and static libraries).
 
 ## Rules that matter
 
@@ -56,7 +56,7 @@ Helper scripts in `scripts/` (read each script's header first):
 - **Build release packages in CI, not against the user's local libraries,** unless the user says otherwise (release.md § CI). The `.hpkg` is built in a Haiku R1/beta6 VM.
 - **Build for both amd64 (x86_64) and arm64 (aarch64) on both platforms.** Every release ships both wherever the platform has an arm64 target:
   - **Linux:** one `appimage.yml` job per architecture on `ubuntu-24.04` / `ubuntu-24.04-arm`; each starts its AppImage under X11 and Wayland, so aarch64 runs on real arm64 hardware.
-  - **Haiku/Renku arm64:** Haiku's master arm64 repository has `haiku`/`haiku_devel`, but there is no R1/beta6 arm64 release, no HaikuPorts arm64 repository and no Renku arm64 ISO. So: an app that links **only Haiku's own libraries** (libbe, libtracker, libtranslation) is cross-built on Linux (`templates/tools/haiku-arm64/make-sysroot.sh`, `make HAIKU_CROSS=1`, `packaging/build-hpkg-arm64.sh`) and run on a nightly in QEMU before it ships (`references/haiku-arm64.md`). An app that needs HaikuPorts libraries (FFmpeg, sqlite, openssl…) has no arm64 `.hpkg` yet: the release notes say Haiku is x86_64 only. Check again at every release (renku.md § arm64).
+  - **Haiku/Renku arm64:** Haiku's master arm64 repository has `haiku`/`haiku_devel`, but there is no R1/beta6 arm64 release, no HaikuPorts arm64 repository and no Renku arm64 ISO. So the app is cross-built on Linux (`templates/tools/haiku-arm64/make-sysroot.sh`, `make HAIKU_CROSS=1`, `packaging/build-hpkg-arm64.sh`), with any HaikuPorts libraries cross-built and linked in statically (`build-deps.sh`), and run on a nightly in QEMU, installed onto a 20 GB disk, before it ships (`references/haiku-arm64.md`). Haiku arm64 has no Media Kit and no translators: the app needs stand-ins for its media code, and the release notes say what doesn't work there. Check again at every release (renku.md § arm64).
 - **Linux builds use Hokku**, the user's Cosmoe fork (github.com/idumych/hokku): fix Cosmoe bugs there instead of working around them in apps, and never contribute upstream (cosmoe-linux.md).
 - **Linux means X11 and Wayland:** Cosmoe picks its backend from `WAYLAND_DISPLAY` / `COSMOE_BACKEND`; the AppImage bundles both, and `appimage.yml` smoke-tests it on headless sway (cosmoe-linux.md).
 - **Test the exact artifact you publish.** Build every package from one commit, test those files, publish them only after the release gate passes and a human says so, then re-test from the release URLs.

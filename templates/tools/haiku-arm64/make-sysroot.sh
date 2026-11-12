@@ -1,7 +1,7 @@
 #!/bin/sh
 # make-sysroot.sh — builds what an app needs to be compiled on Linux for Haiku arm64:
 # Haiku's cross toolchain (gcc 13 for aarch64-unknown-haiku), Haiku's host tools (package,
-# rc, xres, bfs_shell) and a sysroot made from the official arm64 packages.
+# rc, xres, addattr, bfs_shell) and a sysroot made from the official arm64 packages.
 #
 #   sh tools/haiku-arm64/make-sysroot.sh [WORK_DIR]        (default ./.haiku-arm64)
 #   . WORK_DIR/env.sh && make HAIKU_CROSS=1 && sh packaging/build-hpkg-arm64.sh
@@ -69,12 +69,12 @@ if [ -z "$JAM" ]; then
 	JAM=$(ls "$WORK"/buildtools/jam/bin.*/jam | head -1)
 fi
 ( cd "$WORK/generated" && "$JAM" -q -j"$JOBS" '<build>package' '<build>rc' '<build>xres' \
-	'<build>bfs_shell' > "$WORK/host-tools.log" 2>&1 ) \
+	'<build>addattr' '<build>bfs_shell' > "$WORK/host-tools.log" 2>&1 ) \
 	|| { tail -20 "$WORK/host-tools.log"; exit 1; }
 T=$(find "$WORK/generated/objects" -type d -path '*/release/tools' | head -1)
 # Only these go on PATH: Haiku's host mimeset doesn't recognise arm64 binaries (it would set
 # BEOS:TYPE to application/octet-stream), so it is left out
-for t in package/package rc/rc xres bfs_shell/bfs_shell; do
+for t in package/package rc/rc xres addattr/addattr bfs_shell/bfs_shell; do
 	ln -sf "$T/$t" "$WORK/bin/$(basename "$t")"
 done
 
@@ -120,17 +120,19 @@ echo "$VERSION" > "$WORK/sysroot/.version"
 
 # 7. env.sh. Kit headers go first (-I); the C library headers come after the compiler's own
 #    C++ headers (-idirafter), as Haiku's native compiler orders them, or libstdc++'s
-#    #include_next <stdlib.h> fails.
+#    #include_next <stdlib.h> fails. bsd and gnu go before posix: posix/features.h is an
+#    empty stand-in, and bsd/features.h must win to define _DEFAULT_SOURCE (NI_MAXHOST,
+#    h_errno...).
 cat > "$WORK/env.sh" <<EOF
 # source me: . $WORK/env.sh   — Haiku arm64 cross build ($VERSION)
-HAIKU_ARM64="$WORK"
+export HAIKU_ARM64="$WORK"
 export PATH="\$HAIKU_ARM64/generated/cross-tools-arm64/bin:\$HAIKU_ARM64/bin:\$PATH"
 export HAIKU_ARM64_SYSROOT="\$HAIKU_ARM64/sysroot"
 export HAIKU_ARM64_VERSION="$VERSION"
 _s=\$HAIKU_ARM64_SYSROOT/develop/headers
 _inc=""
 for _d in \$(find \$_s/os -mindepth 1 -type d) \$_s/os \$_s/be_apps/Tracker; do _inc="\$_inc -I\$_d"; done
-for _d in \$_s/posix \$_s/gnu \$_s/bsd \$_s; do _inc="\$_inc -idirafter \$_d"; done
+for _d in \$_s/bsd \$_s/gnu \$_s/posix \$_s; do _inc="\$_inc -idirafter \$_d"; done
 export CC=aarch64-unknown-haiku-gcc CXX=aarch64-unknown-haiku-g++
 export HAIKU_CROSS_CFLAGS="--sysroot=\$HAIKU_ARM64_SYSROOT\$_inc"
 export HAIKU_CROSS_LDFLAGS="--sysroot=\$HAIKU_ARM64_SYSROOT -B\$HAIKU_ARM64_SYSROOT/develop/lib -L\$HAIKU_ARM64_SYSROOT/develop/lib -L\$HAIKU_ARM64_SYSROOT/lib -Wl,-rpath-link=\$HAIKU_ARM64_SYSROOT/lib"

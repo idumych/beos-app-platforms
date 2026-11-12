@@ -1,0 +1,21 @@
+Haiku arm64: no SIGILL feature probing in OpenSSL_cpuid_setup
+
+--- a/crypto/armcap.c
++++ b/crypto/armcap.c
+@@ -267,6 +267,16 @@
+         return;
+     }
+ 
++#if defined(__HAIKU__)
++    /*
++     * No probing on Haiku: its arm64 kernel panics on some of the SIGILL
++     * probes below (the SVE one traps as exception class 25) instead of
++     * signalling the process. NEON is in every aarch64 CPU.
++     */
++    OPENSSL_armcap_P = ARMV7_NEON;
++    return;
++#endif
++
+ #if defined(__APPLE__)
+ #if !defined(__aarch64__)
+     /*

@@ -32,7 +32,7 @@ just unfinished, and say why in the README and the release notes' "Tested" secti
 "Linux: not available; the app runs VPN tunnels through Haiku's own network stack").
 The gate prints the platforms it checked on its first line.
 
-Both architectures on every platform that has an arm64 target (SKILL.md rules). Haiku arm64 is blocked for now (renku.md § arm64): check at each release.
+Both architectures on every platform that has an arm64 target (SKILL.md rules). Haiku arm64 is cross-built and tested on a nightly in QEMU (haiku-arm64.md); check at each release whether an R1/beta6 or HaikuPorts arm64 repository has appeared (renku.md § arm64).
 
 ## Starting cold
 
@@ -161,7 +161,7 @@ from `APPIMAGE_APT_EXTRA`; a Makefile Cosmoe branch without the app's libraries;
     Linux (glibc 2.39+): `chmod +x <App>-<V>-x86_64.AppImage && ./<App>-<V>-x86_64.AppImage` (`-aarch64` on ARM)
     ### Tested
     One line per platform: the OS and version from the evidence `os:` line, and what was
-    exercised. Then say plainly what was NOT tested (the aarch64 AppImage was only started in CI; Haiku has no arm64 build; real hardware,
+    exercised. Then say plainly what was NOT tested (the aarch64 AppImage was only started in CI; Haiku arm64 only ran on a nightly in QEMU; real hardware,
     interactive Wayland, Renku OS, drag and drop from a Linux file manager…).
     ### Checksums
     See SHA256SUMS.

@@ -21,7 +21,7 @@ Claude loads it when a task involves building, porting, packaging, releasing or 
 | Platform | Package | Built | Tested |
 |---|---|---|---|
 | [Renku OS](https://github.com/RenkuOS/Source) (a Haiku fork) and [Haiku](https://www.haiku-os.org) R1/beta6, x86_64 | `.hpkg`; one package installs on both (Renku still calls its system package `haiku r1~beta6`) | In a Haiku R1/beta6 VM, on a GitHub runner, or on Renku itself | In a VM: installed, launched, driven, read back from disk |
-| Haiku arm64 | `.hpkg`, for apps that use only Haiku's own libraries | Cross-built on Linux (there is no R1/beta6 or HaikuPorts arm64 repository yet; the skill says how to check at each release) | On an arm64 nightly in QEMU |
+| Haiku arm64 | `.hpkg`; HaikuPorts libraries are cross-built and linked in statically | Cross-built on Linux (there is no R1/beta6 or HaikuPorts arm64 repository yet; the skill says how to check at each release) | On an arm64 nightly in QEMU, installed onto a 20 GB disk |
 | Linux, through [Hokku](https://github.com/idumych/hokku) (a fork of [Cosmoe](https://github.com/haydentech/cosmoe)) | AppImage, x86_64 and aarch64, bundling both the X11 and the Wayland backend | Natively per architecture in GitHub CI, on the oldest supported distro | Full test under Xvfb; started under X11 and headless Wayland on both architectures in CI |
 
 ## Ground rules it enforces
@@ -45,7 +45,7 @@ Each of these cost real time once, and is now a paragraph, a check or a script.
 
 **Building and packaging**
 - AppImages built on an Arch/CachyOS host crashed on older CPUs (x86-64-v3 code) and wouldn't start on Ubuntu 24.04 (newer glibc). Releases are built in CI on the oldest supported distro.
-- No arm64 Haiku release to build on: apps that use only Haiku's libraries are cross-built against a sysroot made from the master arm64 repository and tested on a nightly in QEMU.
+- No arm64 Haiku release to build on: apps are cross-built against a sysroot made from the master arm64 repository, with HaikuPorts libraries (OpenSSL, TDLib…) cross-built and linked in, and tested on a nightly in QEMU. Haiku arm64 has no Media Kit or translators yet.
 - Renku's `haiku_devel` lagged its nightly, and installing it meant a system downgrade and a reboot. The skill extracts it beside the toolchain instead, with the exact compiler flags (`-B`, and `-idirafter`, because libstdc++'s `#include_next` fails with `-isystem`).
 - Resources stripped off binaries (strip at link time: `xres` appends after the ELF data); `.PackageInfo` details that make one package install on both Haiku and Renku.
 
@@ -96,7 +96,7 @@ Or, to share it with one project's collaborators, put it in that project's `.cla
 | `references/onboard.md` | Setting an app up for releases: `haiku-app.env`, the Makefile contract, templates, the app's test plan |
 | `references/release-test.md` | Testing each package on its platform and writing the evidence; the shared test VM |
 | `references/renku.md` | Renku OS and Haiku guests: VMs (VirtualBox or QEMU), the boot hang, SSH, building on Renku, the `.hpkg`, CI builds, arm64 status, bug reports |
-| `references/haiku-arm64.md` | The arm64 `.hpkg`: cross toolchain and sysroot, the QEMU test machine, what can't be built yet |
+| `references/haiku-arm64.md` | The arm64 `.hpkg`: cross toolchain, sysroot and static libraries, what Haiku arm64 lacks, the QEMU test machine |
 | `references/cosmoe-linux.md` | Hokku/Cosmoe: using and fixing Hokku, porting traps, the AppImage, CI, headless X11 and Wayland tests |
 | `references/beos.md` | The original on BeOS 5 in VirtualBox, for checking a BeOS app's port against it: installing BeOS 5.0.3, the video mode, files in on a CD image, driving it without SSH, measuring the port against it |
 | `references/virtualbox.md` | Driving VMs: scancodes, mouse, screenshots, files, hangs |
@@ -122,7 +122,8 @@ The scripts have been used on Arch-based hosts (CachyOS) with VirtualBox 7.2 and
 ## Known open issues
 
 - Renku build00064 hangs on every boot after the first; test VMs are recopied per boot until that's fixed.
-- Apps that need HaikuPorts libraries can't ship arm64 `.hpkg`s until HaikuPorts has an arm64 repository.
+- Haiku arm64 has no Media Kit or translators: arm64 builds of apps that play sound or video, or decode pictures, lose those features.
+- Haiku arm64's kernel panics when a program's SIGILL probe hits an SVE instruction (OpenSSL's CPU detection); the OpenSSL build patches the probing out.
 - The JamesDSP node showed occasional dropouts in QEMU when the host was busy; whether the node is the cause hasn't been settled.
 
 ## Credits

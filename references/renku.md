@@ -14,9 +14,16 @@ Check at every release:
     curl -s -o /dev/null -w '%{http_code}\n' https://eu.hpkg.haiku-os.org/haikuports/master/arm64/current/ # 404 = no HaikuPorts arm64 repo
     gh release view nightly -R RenkuOS/Source --json assets -q '.assets[].name' | grep -i arm             # a Renku arm64 ISO?
 
-As of Oct 2026 only Haiku's own master arm64 repository exists, so apps that use nothing but
-Haiku's libraries are cross-built and tested in QEMU (haiku-arm64.md); apps needing HaikuPorts
-libraries wait for a HaikuPorts arm64 repository.
+As of Nov 2026 only Haiku's own master arm64 repository exists, so apps are cross-built, with
+HaikuPorts libraries linked in statically, and tested on a Haiku nightly in QEMU
+(haiku-arm64.md). Renku has an arm64 ports repository (RenkuOSPorts,
+`https://renkuos.freemyip.com/repo/renkuosports/arm64/`, built natively in QEMU from
+`RenkuOS/RenkuOSPorts` `renkuos/bootstrap/arm64`): about 340 ports, among them openssl3, zlib,
+opus, libogg, ffmpeg 6/8, libjpeg_turbo, libpng16, libwebp and SDL2, but no `haiku` system
+package (so no Media Kit or translators), no tdlib, and no Renku arm64 image. Check its package
+list at each release:
+
+    curl -s https://renkuos.freemyip.com/repo/renkuosports/arm64/ | grep -oE 'packages/[^"]+' | sed 's|packages/||'
 
 ## Make a test VM
 
