@@ -135,9 +135,18 @@ if has haiku && [ -s "$D/$HPKG_ARM64" ]; then
 	[ "$(field "$f" sha256)" = "$(sha256sum "$D/$HPKG_ARM64" | cut -d' ' -f1)" ] && ok "haiku-arm64 sha256" \
 		|| bad "haiku-arm64 sha256" "$f missing or for a different file than $D/$HPKG_ARM64"
 	[ "$(field "$f" commit)" = "$HEAD" ] && ok "haiku-arm64 commit" || bad "haiku-arm64 commit" "tested build is from '$(field "$f" commit)', HEAD is $HEAD"
-	for c in install launch $FEATURE_CHECKS quit; do
+	for c in install launch quit; do
 		grep -qE "^CHECK $c PASS" "$f" 2>/dev/null && ok "haiku-arm64 $c" || bad "haiku-arm64 $c" "no 'CHECK $c PASS' line in $f"
 	done
+	# A feature check the arm64 nightly can't run (no browser, no Media Kit)
+	# may be "CHECK <name> N/A <why>" (haiku-arm64.md: say why one can't run).
+	for c in $FEATURE_CHECKS; do
+		if grep -qE "^CHECK $c PASS" "$f" 2>/dev/null; then ok "haiku-arm64 $c"
+		elif grep -qE "^CHECK $c N/A .{10,}" "$f" 2>/dev/null; then
+			ok "haiku-arm64 $c N/A: $(grep -m1 -E "^CHECK $c N/A" "$f" | cut -d' ' -f4- | cut -c1-60)"
+		else bad "haiku-arm64 $c" "no 'CHECK $c PASS' (or 'N/A <why>') line in $f"; fi
+	done
+	grep -qE "^CHECK [^ ]+ FAIL" "$f" 2>/dev/null && bad "haiku-arm64 fail" "$(grep -m1 -E '^CHECK [^ ]+ FAIL' "$f")"
 	grep -qx 'RESULT: PASS' "$f" 2>/dev/null && ok "haiku-arm64 result" || bad "haiku-arm64 result" "no 'RESULT: PASS' line"
 fi
 
