@@ -44,8 +44,8 @@ its header in `headers/private/interface`, and the link-time SDK (`make-sdk.sh`)
       #ifdef APP_VOS
           BAboutWindow* about = new BAboutWindow(B_TRANSLATE_SYSTEM_NAME("MyApp"), kAppSig);
           about->AddDescription(B_TRANSLATE("One sentence on what it does."));
-          const char* extra[] = { "2026 the MyApp contributors", NULL };
-          about->AddCopyright(2022, "Original Author", extra);
+          const char* extra[] = { "2022 Original Author (Original App)", NULL };
+          about->AddCopyright(2026, "the MyApp contributors", extra);
           about->AddExtraInfo(B_TRANSLATE("Distributed under the terms of the MIT License."));
           about->Show();
       #else
@@ -55,8 +55,15 @@ its header in `headers/private/interface`, and the link-time SDK (`make-sdk.sh`)
 
 - The menu item must reach `be_app` (`item->SetTarget(be_app)` or
   `be_app->PostMessage(B_ABOUT_REQUESTED)`), or About does nothing (Test checklist below).
-- Test it on V\OS: the window must show the version (`0.1.0`), which an alert never does;
-  OCR the screenshot for it.
+- **`AddCopyright(year, holder)` runs `year` up to the current year** ("© 2022-2026"). For a
+  port, make the port's contributors the holder and put the original author's fixed years
+  in `extraCopyrights`, or the window credits them with years they didn't work on it. It
+  also appends "All Rights Reserved." itself, as on Haiku.
+- **The version line comes from the .rdef's `app_version`:** "Version 0.1" for 0.1.0 (a
+  zero third number is left out), followed by "-development", "-beta" … unless `variety`
+  is `B_APPV_FINAL`. Set it to final before a release.
+- Test it on V\OS: the window must show "Version …" without a variety, which an alert never
+  does; OCR the screenshot for it.
 - Seen with it: `B_TRANSLATE` links `BLocaleRoster::GetCatalog()` from `liblocalestub.a`, which
   older SDKs didn't ship (`make-sdk.sh` now builds and copies it; deb.yml's cache key hashes
   `tools/vos-sdk/*`, so the SDK rebuilds). On a host with Hokku installed, `-llocalestub`
