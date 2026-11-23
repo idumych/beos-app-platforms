@@ -1,29 +1,57 @@
+> **No VirtualBox any more** (SKILL.md § Rules): run VMs in QEMU with `scripts/qemu-vm.sh`. The VirtualBox steps below are kept only for what carries over (scancodes, guest-side setup, screenshot hygiene).
+
 # Renku OS (and Haiku-family guests)
 
 Renku OS (github.com/RenkuOS/Source) is a fork of Haiku that started in September 2026. For packaging it's still Haiku:
 
 - **Package name and version.** The system package is still called `haiku`, with `HAIKU_VERSION = r1~beta6` (`build/jam/BuildSetup`). A package that `requires { haiku >= r1~beta6 }` installs on both Haiku R1/beta6 and Renku. A binary built on Haiku beta6 ran unchanged on Renku nightly build00055 (hrev60072+253).
-- **Nightlies:** `gh release view nightly -R RenkuOS/Source` (x86_64 and x86_gcc2h ISOs, each with a `.sha256`). Download into `~/Downloads` and check with `sha256sum -c`. Some nights only the x86_gcc2h ISO is attached, so there may be no x86_64 image until a later build.
+- **Nightlies:** `gh release view nightly -R RenkuOS/Source` (x86_64 and x86_gcc2h ISOs, an arm64 `.img.zst` for QEMU, and each architecture's repository as a `.tar`, each with a `.sha256`). Download into `~/Downloads` and check with `sha256sum -c`. Some nights only the x86_gcc2h ISO is attached, so there may be no x86_64 image until a later build.
 - **Policy:** `AGENTS.md` in RenkuOS/Source, plus `RenkuOS/PlanAndGovernance` (CONTRIBUTING, REVIEW, DECISIONS). Machine-assisted work is allowed. Pull requests need a short human-style summary, a "How this was tested" section and a DCO `Signed-off-by`. Issues go to RenkuOS/Source. Renku has its own package repository ("Spritz Depot"); see its open issues for the submission process.
+
+## Renku's repositories (Renku OS only)
+
+Renku publishes its own package repositories, all built from one Renku build (Nov 2026:
+`r1~beta6_hrev60072_940`):
+
+| Repository | URL | Has |
+|---|---|---|
+| System, x86_64 | `https://renkuos.freemyip.com/repo/x86_64` | `haiku`, `haiku_devel`, `haiku_loader`, `haiku_extras`, `haiku_datatranslators`, `makefile_engine`, `netfs`, `userland_fs`, `webpositive` |
+| System, arm64 | `https://renkuos.freemyip.com/repo/arm64` | the same, without WebPositive |
+| System, x86_gcc2 (32-bit hybrid) | `https://renkuos.freemyip.com/repo/x86_gcc2` | the same plus `haiku_x86`, `haiku_x86_devel`, `webpositive_x86` |
+| Ports (RenkuOSPorts) | `https://renkuos.freemyip.com/repo/renkuosports/<arch>` | HaikuPorts recipes built for Renku |
+
+- **Use them only with Renku OS.** Add them (`pkgman add-repo <url>`) on Renku systems, and use
+  their packages only in builds that target Renku (the arm64 sysroot). Never add them to a
+  Haiku VM or mix their packages into a build meant for Haiku.
+- Each repository's page lists its packages, the files are under `<url>/packages/`, and
+  `<url>/repo.info` names the build. The same repositories ship as `renkuos-<arch>-repo.tar` with
+  each nightly (`gh release view nightly -R RenkuOS/Source`).
+- `haiku_devel` is in the system repository, so on Renku `pkgman install haiku_devel` gives the
+  headers for the installed build when the image and the repository are the same build. Check
+  `pkgman search -a haiku` against `uname -v` first (§ Build an hpkg, for when they differ).
 
 ## arm64
 
-Check at every release:
+arm64 apps target **Renku OS**, not Haiku. Haiku has no R1/beta6 arm64 release, and arm64 builds
+no longer use Haiku's master repository or its nightlies. Renku has all three pieces:
 
-    curl -s -o /dev/null -w '%{http_code}\n' https://eu.hpkg.haiku-os.org/haiku/r1beta6/arm64/current/   # 404 = no arm64 R1/beta6 repo
-    curl -s -o /dev/null -w '%{http_code}\n' https://eu.hpkg.haiku-os.org/haikuports/master/arm64/current/ # 404 = no HaikuPorts arm64 repo
-    gh release view nightly -R RenkuOS/Source --json assets -q '.assets[].name' | grep -i arm             # a Renku arm64 ISO?
+- **System packages:** `haiku` and `haiku_devel` in its arm64 system repository (above). The
+  sysroot is made from them (haiku-arm64.md).
+- **Ports:** RenkuOSPorts arm64 (`https://renkuos.freemyip.com/repo/renkuosports/arm64/`, built
+  natively in QEMU from `RenkuOS/RenkuOSPorts` `renkuos/bootstrap/arm64`): about 340 ports,
+  among them `gcc_syslibs`, `icu74`, `zlib`, openssl3, opus, libogg, ffmpeg 6/8, libjpeg_turbo,
+  libpng16, libwebp and SDL2, but no tdlib. Check its list at each release:
 
-As of Nov 2026 only Haiku's own master arm64 repository exists, so apps are cross-built, with
-HaikuPorts libraries linked in statically, and tested on a Haiku nightly in QEMU
-(haiku-arm64.md). Renku has an arm64 ports repository (RenkuOSPorts,
-`https://renkuos.freemyip.com/repo/renkuosports/arm64/`, built natively in QEMU from
-`RenkuOS/RenkuOSPorts` `renkuos/bootstrap/arm64`): about 340 ports, among them openssl3, zlib,
-opus, libogg, ffmpeg 6/8, libjpeg_turbo, libpng16, libwebp and SDL2, but no `haiku` system
-package (so no Media Kit or translators), no tdlib, and no Renku arm64 image. Check its package
-list at each release:
+      curl -s https://renkuos.freemyip.com/repo/renkuosports/arm64/ | grep -oE 'packages/[^"]+' | sed 's|packages/||'
 
-    curl -s https://renkuos.freemyip.com/repo/renkuosports/arm64/ | grep -oE 'packages/[^"]+' | sed 's|packages/||'
+- **A test system:** Renku's nightly has an arm64 image for QEMU's `virt` machine,
+  `RenkuOS-arm64-<date>-build<NNN>.img.zst` (decompress with `zstd -d`). It's Tier 2 ("ships
+  when it boots") and has no clock driver, so its clock starts in 1970. Its partition layout is
+  the same as Haiku's arm64 image, so `scripts/haiku-arm64-vm.sh` installs it onto a 20 GB disk
+  (haiku-arm64.md § Test). build00090's first boot works but every later boot of the same image hangs (RenkuOS/Source#480,
+  haiku-arm64.md § Test).
+
+      gh release view nightly -R RenkuOS/Source --json assets -q '.assets[].name' | grep arm64
 
 ## Make a test VM
 
@@ -150,15 +178,16 @@ The pipeline builds it inside a Haiku R1/beta6 VM with `templates/packaging/buil
 So far packages have been **built** on Haiku beta6 and **tested** on Renku. Building directly on Renku works (JamesDSP's media add-on, Oct 2026) with one catch:
 
 **`haiku_devel` can lag the nightly.** The Renku image has no system headers or startup
-objects, and its repository's `haiku_devel` was for an older build (hrev60072_341) than
-the image (…_355): `pkgman install haiku_devel` only offers to downgrade the system
-package, which needs a reboot (and reboots hang, above). Don't. Download the package and
-extract it next to the toolchain instead:
+objects. Install `haiku_devel` from Renku's system repository (§ Renku's repositories) when it
+is the image's build. It once was older (hrev60072_341 against the image's …_355), and then
+`pkgman install haiku_devel` only offers to downgrade the system package, which needs a reboot
+(and reboots hung, above). Don't. Download the package and extract it next to the toolchain
+instead:
 
 ```sh
 pkgman install -y gcc make
 mkdir -p ~/devel/sys && cd ~/devel
-curl -fsSLO <Renku repo base-url>/packages/haiku_devel-<version>-x86_64.hpkg   # base-url: pkgman list-repos -v
+curl -fsSLO https://renkuos.freemyip.com/repo/x86_64/packages/haiku_devel-<version>-x86_64.hpkg
 package extract -C sys haiku_devel-*.hpkg
 D=~/devel/sys/develop
 INC="-idirafter $D/headers/posix -idirafter $D/headers -idirafter $D/headers/os"

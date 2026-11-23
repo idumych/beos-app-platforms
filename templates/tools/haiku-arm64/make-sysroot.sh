@@ -1,47 +1,45 @@
 #!/bin/sh
-# make-sysroot.sh — builds what an app needs to be compiled on Linux for Haiku arm64:
-# Haiku's cross toolchain (gcc 13 for aarch64-unknown-haiku), Haiku's host tools (package,
-# rc, xres, addattr, bfs_shell) and a sysroot made from the official arm64 packages.
+# make-sysroot.sh — builds what an app needs to be compiled on Linux for Renku OS arm64:
+# the cross toolchain (gcc 13 for aarch64-unknown-haiku), the host tools (package, rc, xres,
+# addattr, bfs_shell) and a sysroot made from Renku's arm64 packages.
 #
 #   sh tools/haiku-arm64/make-sysroot.sh [WORK_DIR]        (default ./.haiku-arm64)
 #   . WORK_DIR/env.sh && make HAIKU_CROSS=1 && sh packaging/build-hpkg-arm64.sh
 #
-# Runs on an x86_64 Linux host with a C/C++ toolchain, git, curl, unzip, python3, flex,
-# bison, texinfo (makeinfo), zlib and zstd headers. Takes about 20 minutes; the result is
-# about 3 GB and can be cached (CI) or kept between releases.
+# Runs on an x86_64 Linux host with a C/C++ toolchain, git, curl, flex, bison,
+# texinfo (makeinfo), zlib and zstd headers. Takes about 20 minutes; the result is about
+# 3 GB and can be cached (CI) or kept between releases.
 #
-# Where the pieces come from:
-#  - Haiku's arm64 package repository (master) has haiku and haiku_devel: libroot, libbe,
-#    libtracker, libtranslation, the CRT objects and the headers. Its hrev picks the Haiku
-#    source revision for the toolchain, so both match.
-#  - libbe needs libstdc++, libgcc_s, ICU and zlib. On arm64 they only exist as the
-#    bootstrap packages inside the nightly image of the same hrev; bfs_shell copies them out.
-#  - HaikuPorts has no arm64 repository, so an app that needs HaikuPorts libraries (sqlite,
-#    openssl, ffmpeg, ...) can't be built this way yet.
+# Where the pieces come from (all Renku, since arm64 builds target Renku OS, not Haiku):
+#  - Renku's arm64 system repository has haiku and haiku_devel: libroot, libbe, libtracker,
+#    libtranslation, the CRT objects and the headers.
+#  - libbe needs libstdc++, libgcc_s, ICU and zlib: gcc_syslibs, icu74 and zlib from Renku's
+#    arm64 ports repository (RenkuOSPorts).
+#  - The toolchain and host tools are built from RenkuOS/Source with Haiku's buildtools.
+# These repositories are for Renku OS only: the packages built here are tested on Renku
+# arm64, and the repositories are never added to a Haiku system.
 # None of this is sent anywhere: only public downloads.
 set -eu
 
 WORK=$(mkdir -p "${1:-.haiku-arm64}" && cd "${1:-.haiku-arm64}" && pwd)
 JOBS=$(nproc 2>/dev/null || echo 4)
-REPO=https://eu.hpkg.haiku-os.org/haiku/master/arm64
-NIGHTLY=https://haiku-nightly.cdn.haiku-os.org/arm64
+REPO=https://renkuos.freemyip.com/repo/arm64
+PORTS=https://renkuos.freemyip.com/repo/renkuosports/arm64
 say() { printf '\n== %s\n' "$*"; }
 
-# 1. Which hrev the arm64 repository is at ("current" redirects to a versioned path)
-say "Haiku arm64 repository"
-ROUTE=$(curl -fsSL "$REPO/current/")
-HREV=$(echo "$ROUTE" | grep -oE 'hrev[0-9]+' | head -1)
-VERSION=$(echo "$ROUTE" | grep -oE 'r1~[a-z0-9]+_hrev[0-9]+' | head -1)
-[ -n "$HREV" ] && [ -n "$VERSION" ] || { echo "make-sysroot: can't read $REPO/current/: $ROUTE" >&2; exit 1; }
+# 1. Which Renku build the arm64 repository is at (its page lists the packages)
+say "Renku arm64 repository"
+VERSION=$(curl -fsSL "$REPO/" | grep -oE 'haiku-r1~[a-z0-9]+_hrev[0-9]+_[0-9]+-1-arm64\.hpkg' | head -1 \
+	| sed -E 's/^haiku-(.*)-1-arm64\.hpkg$/\1/')
+[ -n "$VERSION" ] || { echo "make-sysroot: can't read the package list at $REPO/" >&2; exit 1; }
 echo "$VERSION"
 if [ -f "$WORK/sysroot/.version" ] && [ "$(cat "$WORK/sysroot/.version")" = "$VERSION" ]; then
 	echo "sysroot for $VERSION is already there"; exit 0
 fi
 
-# 2. Sources: Haiku at that hrev (Haiku's own git has the hrev tags), buildtools
+# 2. Sources: RenkuOS/Source (the system the packages come from) and Haiku's buildtools
 say "Sources"
-[ -d "$WORK/haiku/.git" ] || git clone -q --depth 1 --branch "$HREV" \
-	https://review.haiku-os.org/haiku "$WORK/haiku"
+[ -d "$WORK/haiku/.git" ] || git clone -q --depth 1 https://github.com/RenkuOS/Source "$WORK/haiku"
 [ -d "$WORK/buildtools/.git" ] || git clone -q --depth 1 \
 	https://review.haiku-os.org/buildtools "$WORK/buildtools"
 
@@ -59,6 +57,11 @@ if [ ! -x "$CROSS" ]; then
 	say "Cross toolchain (about 15 minutes)"
 	( cd "$WORK/generated" && HAIKU_NASM="$WORK/bin/nasm-stub" ../haiku/configure \
 		--cross-tools-source ../buildtools --build-cross-tools arm64 -j"$JOBS" )
+elif [ ! -f "$WORK/generated/build/BuildConfig" ]; then
+	# A compiler copied in from an earlier build (haiku-arm64.md: flex): configure around it
+	say "Configuring with the existing cross toolchain"
+	( cd "$WORK/generated" && HAIKU_NASM="$WORK/bin/nasm-stub" ../haiku/configure \
+		--cross-tools-prefix "$WORK/generated/cross-tools-arm64/bin/aarch64-unknown-haiku-" )
 fi
 
 # 4. jam, then Haiku's host tools
@@ -78,34 +81,26 @@ for t in package/package rc/rc xres addattr/addattr bfs_shell/bfs_shell; do
 	ln -sf "$T/$t" "$WORK/bin/$(basename "$t")"
 done
 
-# 5. Packages: haiku and haiku_devel from the repository, the bootstrap libraries from the
-#    nightly image of the same hrev
+# 5. Packages: haiku and haiku_devel from Renku's system repository, the runtime libraries
+#    libbe links against from Renku's ports repository
 say "Packages"
 P="$WORK/packages"
 mkdir -p "$P"
 for pkg in haiku haiku_devel; do
 	f="$pkg-$VERSION-1-arm64.hpkg"
-	[ -s "$P/$f" ] || curl -fsSL -o "$P/$f" "$REPO/$VERSION/packages/$f"
+	[ -s "$P/$f" ] || curl -fsSL -o "$P/$f" "$REPO/packages/$f"
 done
-IMG="haiku-master-$HREV-arm64-mmc"
-if [ ! -s "$P/$IMG.image" ]; then
-	curl -fsSL -o "$P/$IMG.zip" "$NIGHTLY/$IMG.zip" \
-		|| { echo "make-sysroot: no nightly image $IMG.zip (the repository moved on?)" >&2; exit 1; }
-	curl -fsSL -o "$P/$IMG.zip.sha256" "$NIGHTLY/$IMG.zip.sha256"
-	( cd "$P" && sha256sum -c "$IMG.zip.sha256" && unzip -o -q "$IMG.zip" "$IMG.image" )
-	rm -f "$P/$IMG.zip"
-fi
-# The BFS partition is the image's second partition
-OFFSET=$(( $(python3 -c 'import struct,sys
-d=open(sys.argv[1],"rb").read(512)
-print(struct.unpack_from("<I", d, 446 + 16 + 8)[0])' "$P/$IMG.image") * 512 ))
-LIST=$(printf 'ls /myfs/system/packages\nexit\n' | "$WORK/bin/bfs_shell" --start-offset "$OFFSET" \
-	"$P/$IMG.image" 2>/dev/null | grep -oE '(gcc_syslibs|icu[0-9]*|zlib)-[^ ]*bootstrap[^ ]*\.hpkg' | sort -u)
-[ -n "$LIST" ] || { echo "make-sysroot: no bootstrap packages found in $IMG.image" >&2; exit 1; }
-CMDS=""
-for f in $LIST; do CMDS="${CMDS}cp /myfs/system/packages/$f :$P/$f
-"; done
-printf '%sexit\n' "$CMDS" | "$WORK/bin/bfs_shell" --start-offset "$OFFSET" "$P/$IMG.image" > /dev/null 2>&1
+PORTLIST=$(curl -fsSL "$PORTS/" | grep -oE 'packages/[^"]+\.hpkg' | sed 's|packages/||')
+LIST=""
+# Ports the app links against besides those (HPKG_ARM64_PORTS in haiku-app.env, e.g.
+# "curl curl_devel"), so they're in the sysroot too
+APP_PORTS=$( [ -f ./haiku-app.env ] && . ./haiku-app.env && echo "${HPKG_ARM64_PORTS:-}" || : )
+for name in gcc_syslibs 'icu[0-9]+' zlib $APP_PORTS; do
+	f=$(echo "$PORTLIST" | grep -E "^$name-[0-9][^-]*-[0-9]+-arm64\.hpkg$" | sort -V | tail -1)
+	[ -n "$f" ] || { echo "make-sysroot: no $name package in $PORTS/" >&2; exit 1; }
+	[ -s "$P/$f" ] || curl -fsSL -o "$P/$f" "$PORTS/packages/$f"
+	LIST="$LIST $f"
+done
 echo "$LIST"
 
 # 6. Sysroot: the packages extracted as they'd be under /boot/system
@@ -124,7 +119,7 @@ echo "$VERSION" > "$WORK/sysroot/.version"
 #    empty stand-in, and bsd/features.h must win to define _DEFAULT_SOURCE (NI_MAXHOST,
 #    h_errno...).
 cat > "$WORK/env.sh" <<EOF
-# source me: . $WORK/env.sh   — Haiku arm64 cross build ($VERSION)
+# source me: . $WORK/env.sh   — Renku OS arm64 cross build ($VERSION)
 export HAIKU_ARM64="$WORK"
 export PATH="\$HAIKU_ARM64/generated/cross-tools-arm64/bin:\$HAIKU_ARM64/bin:\$PATH"
 export HAIKU_ARM64_SYSROOT="\$HAIKU_ARM64/sysroot"

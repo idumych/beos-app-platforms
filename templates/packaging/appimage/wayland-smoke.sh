@@ -33,8 +33,13 @@ if [ -z "$SOCK" ]; then
 	echo "wayland-smoke: the compositor did not start"; cat "$OUT/compositor.log"; exit 1
 fi
 
+# Run the AppImage mounted, as users do, when FUSE is there: an app that only worked
+# extracted passed otherwise (Titan found no folder for itself in the read-only mount).
+EXTRACT=1
+if [ -e /dev/fuse ] && { command -v fusermount3 || command -v fusermount; } >/dev/null 2>&1; then EXTRACT=; fi
+echo "starting the AppImage $( [ -n "$EXTRACT" ] && echo extracted || echo mounted )" > "$OUT/run-mode.txt"
 HOME_DIR=$(mktemp -d)
-env -u DISPLAY WAYLAND_DISPLAY=$SOCK COSMOE_BACKEND=wayland APPIMAGE_EXTRACT_AND_RUN=1 \
+env -u DISPLAY WAYLAND_DISPLAY=$SOCK COSMOE_BACKEND=wayland ${EXTRACT:+APPIMAGE_EXTRACT_AND_RUN=1} \
 	WAYLAND_DEBUG=client HOME="$HOME_DIR" "$APP" ${SMOKE_ARGS:-} > "$OUT/app.log" 2> "$OUT/wayland-debug.log" &
 PID=$!
 sleep 15

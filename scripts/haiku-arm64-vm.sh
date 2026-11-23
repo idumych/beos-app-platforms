@@ -1,12 +1,12 @@
 #!/bin/sh
-# haiku-arm64-vm.sh CMD …  — a Haiku arm64 test machine in QEMU (no arm64 VirtualBox on x86).
+# haiku-arm64-vm.sh CMD …  — a Renku OS arm64 test machine in QEMU (no arm64 VirtualBox on x86).
 #
 #   DIR=<vm dir> (default ~/VMs/haiku-arm64)
-#   create IMAGE        a 20 GB disk.img with the nightly's EFI partition and an empty BFS
-#                       partition, and the nightly haiku-master-hrevNNNNN-arm64-mmc.image
-#                       kept as nightly.img for Installer (see haiku-arm64.md: install first)
+#   create IMAGE        a 20 GB disk.img with the image's EFI partition and an empty BFS
+#                       partition, and Renku's RenkuOS-arm64-<date>-build<NNN>.img (zstd -d the
+#                       .img.zst) kept as nightly.img for Installer (haiku-arm64.md: install first)
 #   start [install]     boot headless (UEFI, virt, 4 cores, 3 GB) and wait for the desktop;
-#                       "install" boots the nightly with disk.img attached, to run Installer
+#                       "install" boots the image with disk.img attached, to run Installer
 #   shutdown            Deskbar > Shutdown > Power off, wait for "safe to turn off", then stop
 #   stop                pull the plug (leaves BFS's journal dirty: see put)
 #   shot NAME           screenshot to NAME.png (1024x768)
@@ -19,7 +19,7 @@
 #
 # Needs qemu-system-aarch64, edk2 aarch64 firmware (QEMU_EFI.fd), socat, ImageMagick, python3,
 # and bfs_shell for `put` (BFS_SHELL=, or the one tools/haiku-arm64/make-sysroot.sh builds).
-# The nightly image has no SSH server: drive the desktop, and get files in with `put`.
+# The image has no SSH server set up: drive the desktop, and get files in with `put`.
 # Emulated arm64 is slow (TCG): allow ~2 minutes to boot and a few seconds per action.
 # Needs sfdisk (util-linux) for create.
 set -eu
@@ -54,7 +54,7 @@ start)
 	[ "${1:-}" = install ] && EXTRA="-drive file=nightly.img,if=none,format=raw,id=hd1 -device virtio-blk-device,drive=hd1"
 	: > "$DIR/serial.log"
 	echo "running" > "$DIR/.state"
-	( cd "$DIR" && setsid qemu-system-aarch64 -M virt -cpu max -smp 4 -m 3072 \
+	( cd "$DIR" && setsid qemu-system-aarch64 -M virt -cpu cortex-a72 -smp 4 -m 3072 \
 		-drive if=pflash,format=raw,file=efi.fd,readonly=on -drive if=pflash,format=raw,file=vars.fd \
 		-device ramfb -device qemu-xhci -device usb-kbd -device usb-tablet $EXTRA \
 		-drive file=disk.img,if=none,format=raw,id=hd0 -device virtio-blk-device,drive=hd0 \

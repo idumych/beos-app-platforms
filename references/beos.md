@@ -1,3 +1,5 @@
+> **No VirtualBox any more** (SKILL.md § Rules): run VMs in QEMU with `scripts/qemu-vm.sh`. The VirtualBox steps below are kept only for what carries over (scancodes, guest-side setup, screenshot hygiene).
+
 # The original on BeOS 5: a reference VM for ports of BeOS apps
 
 A port of a BeOS app is checked against the original **running on BeOS**,

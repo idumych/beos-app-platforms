@@ -41,8 +41,13 @@ WM=$!
 for i in $(seq 40); do DISPLAY=$DPY xdotool get_desktop >/dev/null 2>&1 && break; sleep 0.25; done
 DISPLAY=$DPY xdotool get_desktop >/dev/null 2>&1 || { echo "x11-smoke: openbox did not start"; cat "$OUT/wm.log"; exit 1; }
 
+# Run the AppImage mounted, as users do, when FUSE is there: an app that only worked
+# extracted passed otherwise (Titan found no folder for itself in the read-only mount).
+EXTRACT=1
+if [ -e /dev/fuse ] && { command -v fusermount3 || command -v fusermount; } >/dev/null 2>&1; then EXTRACT=; fi
+echo "starting the AppImage $( [ -n "$EXTRACT" ] && echo extracted || echo mounted )" > "$OUT/run-mode.txt"
 HOME_DIR=$(mktemp -d)
-env -u WAYLAND_DISPLAY DISPLAY=$DPY COSMOE_BACKEND=x11 APPIMAGE_EXTRACT_AND_RUN=1 \
+env -u WAYLAND_DISPLAY DISPLAY=$DPY COSMOE_BACKEND=x11 ${EXTRACT:+APPIMAGE_EXTRACT_AND_RUN=1} \
 	HOME="$HOME_DIR" "$APP" ${SMOKE_ARGS:-} > "$OUT/app.log" 2>&1 &
 PID=$!
 # Wait for the app's top-level window (up to 60 s; first runs build font caches).

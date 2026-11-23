@@ -124,8 +124,8 @@ else
 fi
 fi	# has linux
 
-# the arm64 .hpkg (optional: only apps that need nothing from HaikuPorts; haiku-arm64.md),
-# tested on an arm64 nightly in QEMU
+# the arm64 .hpkg (optional; haiku-arm64.md): built for Renku OS arm64, tested on Renku's arm64
+# image in QEMU
 HPKG_ARM64=${APP_CMD}-${V}-${REVISION}-arm64.hpkg
 N=0; WHAT=""
 has haiku && { N=$((N + 1)); WHAT="hpkg"; }
@@ -138,7 +138,7 @@ if has haiku && [ -s "$D/$HPKG_ARM64" ]; then
 	for c in install launch quit; do
 		grep -qE "^CHECK $c PASS" "$f" 2>/dev/null && ok "haiku-arm64 $c" || bad "haiku-arm64 $c" "no 'CHECK $c PASS' line in $f"
 	done
-	# A feature check the arm64 nightly can't run (no browser, no Media Kit)
+	# A feature check Renku arm64 can't run (e.g. no browser)
 	# may be "CHECK <name> N/A <why>" (haiku-arm64.md: say why one can't run).
 	for c in $FEATURE_CHECKS; do
 		if grep -qE "^CHECK $c PASS" "$f" 2>/dev/null; then ok "haiku-arm64 $c"

@@ -2,7 +2,10 @@
 # qemu-vm.sh CMD …  — a Haiku-family x86_64 test machine (Renku, Haiku) in QEMU/KVM.
 #
 #   DIR=<vm dir> (default ~/VMs/haiku-x86_64)   SSH_PORT (default 2225)
-#   AUDIO=wav|pipewire|none (default wav)   QCPU (default host)   QSMP (default 4)
+#   AUDIO=wav|pipewire|none (default wav)   QCPU (default host)   QSMP (default 4)   QMEM in MB (default 4096)
+#   QACCEL=tcg       without KVM (slower), e.g. while VirtualBox VMs run
+#   QEXTRA='…'       more QEMU options, e.g. a second disk:
+#                    -drive file=other.img,format=raw,if=none,id=hd1,snapshot=on -device ide-hd,drive=hd1,bus=ahci.1
 #   create IMAGE     copy an anyboot ISO as a raw disk, grown to 4 GB (the BFS volume
 #                    itself doesn't grow: ~300 MB free, enough for gcc and an app)
 #   start | stop     boot headless | hard power-off (shut down from inside first)
@@ -10,7 +13,7 @@
 #   move|click|dclick|rclick X Y    absolute pointer through QMP (usb-tablet);
 #                    set QW/QH to the screen size (default 1280x800 here)
 #   key KEYS         QEMU key names: alt-q, ret, alt-sysrq-d (kernel debugger) …
-#   type TEXT        plain text: letters, digits, space . / - _ | ' " : &
+#   type TEXT        plain text: letters, digits, space . / - _ | ' " : & ; > < =
 #   status
 #
 # AUDIO=wav writes everything the guest's sound card plays to $DIR/audio-<time>.wav
@@ -47,16 +50,20 @@ start)
 		pipewire) AD="-audiodev pipewire,id=snd0" ;;
 		*) AD="-audiodev none,id=snd0" ;;
 	esac
+	QEXTRA=${QEXTRA:-}
+	# QACCEL=tcg runs without KVM (slower), e.g. while VirtualBox VMs are running.
+	if [ "${QACCEL:-kvm}" = tcg ]; then ACCEL="-accel tcg -cpu ${QCPU:-max}"
+	else ACCEL="-enable-kvm -cpu ${QCPU:-host}"; fi
 	# shellcheck disable=SC2086
-	( cd "$DIR" && setsid qemu-system-x86_64 -enable-kvm -cpu "${QCPU:-host}" \
-		-smp "${QSMP:-4}" -m 4096 \
+	( cd "$DIR" && setsid qemu-system-x86_64 $ACCEL \
+		-smp "${QSMP:-4}" -m "${QMEM:-4096}" \
 		-drive file=disk.img,format=raw,if=none,id=hd0 -device ahci,id=ahci \
 		-device ide-hd,drive=hd0,bus=ahci.0 \
 		-netdev "user,id=n0,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22" -device e1000,netdev=n0 \
 		$AD -device intel-hda -device hda-output,audiodev=snd0 \
 		-vga std -device qemu-xhci -device usb-tablet -display none \
 		-monitor unix:monitor.sock,server,nowait -qmp unix:qmp.sock,server,nowait \
-		-serial file:serial.log > qemu.log 2>&1 & )
+		-serial file:serial.log $QEXTRA > qemu.log 2>&1 & )
 	sleep 2; running && echo "started (serial: $DIR/serial.log)" || { cat "$DIR/qemu.log"; exit 1; } ;;
 stop)
 	running || { echo "not running"; exit 0; }
@@ -74,7 +81,8 @@ type)
 		case $c in
 			' ') k=spc ;; .) k=dot ;; /) k=slash ;; -) k=minus ;; _) k=shift-minus ;;
 			'|') k=shift-backslash ;; "'") k=apostrophe ;; '"') k=shift-apostrophe ;;
-			:) k=shift-semicolon ;; '&') k=shift-7 ;;
+			:) k=shift-semicolon ;; '&') k=shift-7 ;; ';') k=semicolon ;;
+			'>') k=shift-dot ;; '<') k=shift-comma ;; '=') k=equal ;;
 			[A-Z]) k=shift-$(echo "$c" | tr A-Z a-z) ;;
 			'') continue ;; *) k=$c ;;
 		esac

@@ -1,31 +1,30 @@
-# Haiku arm64 `.hpkg`
+# Renku OS arm64 `.hpkg`
 
-There's no R1/beta6 arm64 release and no HaikuPorts arm64 repository (Nov 2026), but Haiku's
-**master** arm64 repository has `haiku` and `haiku_devel`. That's enough to cross-build an app on
-Linux and test it on an arm64 nightly in QEMU. Libraries the app needs from HaikuPorts (OpenSSL,
-sqlite, TDLib…) are cross-built too and linked in statically, so the package requires only
-`haiku`. Done for Powergram 0.2.5 (TDLib, OpenSSL, zlib).
+arm64 builds target **Renku OS**, not Haiku. There's no Haiku R1/beta6 arm64 release, and arm64
+builds no longer use Haiku's master repository or nightlies. Renku has an arm64 system repository
+(`haiku`, `haiku_devel`), an arm64 ports repository and an arm64 image for QEMU (renku.md
+§ arm64). The app is cross-built on Linux against Renku's packages and tested on Renku arm64 in
+QEMU. Libraries the app needs either come from Renku's arm64 ports repository (then the package
+`requires` them) or are cross-built and linked in statically, so the package requires only
+`haiku`. Powergram 0.2.5 (TDLib, OpenSSL, zlib) was done the second way, against Haiku's master
+repository, before Renku had arm64 packages.
 
-## What Haiku arm64 lacks (hrev60397)
+Renku's repositories are for Renku OS only: never add them to a Haiku system or use their
+packages in a build meant for Haiku (renku.md § Renku's repositories).
 
-Check `sysroot/lib` and `sysroot/add-ons` after `make-sysroot.sh`. Missing on arm64:
+## What arm64 lacks
 
-- **The Media Kit:** no `libmedia.so`, no media add-ons or media_server. That rules out
-  BSoundPlayer, BMediaFile, BMediaRecorder, and also `system_beep()` / `add_system_beep_event()`
-  (declared in `Beep.h` but in libmedia). Build stand-ins for those files on arm64 (Powergram:
-  `src/app/NoMediaKit.cpp`, picked by `make HAIKU_CROSS=1`) and say what doesn't work.
-- **Translators:** no `add-ons/Translators`, so `BTranslationUtils` decodes no PNG, JPEG or WebP;
-  pictures get the app's placeholders.
-- **Apps:** no WebPositive, MediaPlayer or other HaikuPorts apps. Opening a URL starts Haiku's
-  URL helper, which runs `wget` in a Terminal and fails. `libgame` and `libscreensaver` are
-  missing too.
-- What is there: libbe, libtracker, libtranslation, libnetwork, libbnetapi, libpackage, libstdc++,
-  ICU, zlib (bootstrap), Terminal, StyledEdit, ShowImage, DriveSetup, Installer, Deskbar, Tracker.
+Check `sysroot/lib` and `sysroot/add-ons` after `make-sysroot.sh`, and compare with x86_64.
+Renku arm64 (hrev60072_940) **has** the Media Kit (`libmedia.so` and the media add-ons) and
+`libgame`, unlike Haiku's arm64 builds (hrev60397), which had neither. Translators aren't in the
+`haiku` package: they're in Renku's `haiku_datatranslators`, so an app that decodes pictures
+requires that package. There's no WebPositive on arm64. Re-check the sysroot at each Renku build. Where something is missing, build stand-ins for those files on arm64
+(Powergram: `src/app/NoMediaKit.cpp`, picked by `make HAIKU_CROSS=1`) and say in the release notes
+what doesn't work.
 
-Renku's arm64 depot (RenkuOSPorts, `https://renkuos.freemyip.com/repo/renkuosports/arm64/`) has
-about 340 ports (openssl3, zlib, opus, libogg, ffmpeg 6/8, libjpeg_turbo, libpng16, libwebp,
-SDL2…) but no `haiku` system package, so no Media Kit or translators either. There's no Renku
-arm64 image (renku.md § arm64).
+RenkuOSPorts arm64 (`https://renkuos.freemyip.com/repo/renkuosports/arm64/`) has about 340 ports
+(openssl3, zlib, opus, libogg, ffmpeg 6/8, libjpeg_turbo, libpng16, libwebp, SDL2…), so check
+there before cross-building a library yourself.
 
 ## Build
 
@@ -34,16 +33,22 @@ arm64 image (renku.md § arm64).
     sh tools/haiku-arm64/build-deps.sh                          # only if the app needs HaikuPorts libraries
     sh packaging/build-hpkg-arm64.sh
 
-- `make-sysroot.sh` builds Haiku's cross gcc at the hrev the arm64 repository is at, the host
-  tools (`package`, `rc`, `xres`, `addattr`, `bfs_shell`) with jam, and a sysroot from `haiku` +
-  `haiku_devel` plus the bootstrap `gcc_syslibs`, `icu` and `zlib` packages, which on arm64 exist
-  only inside the nightly image (copied out with `bfs_shell`). `env.sh` exports `HAIKU_ARM64`,
+- `make-sysroot.sh` builds the cross gcc and the host tools (`package`, `rc`, `xres`, `addattr`,
+  `bfs_shell`) from `RenkuOS/Source` with Haiku's buildtools, and a sysroot from Renku's arm64
+  `haiku` + `haiku_devel` plus `gcc_syslibs`, `icu74` and `zlib` from Renku's arm64 ports
+  repository. Rerun it when Renku's arm64 repository moves to a new build (it checks the
+  version and does nothing otherwise). `env.sh` exports `HAIKU_ARM64`,
   `CC`/`CXX`, `HAIKU_CROSS_CFLAGS` and `HAIKU_CROSS_LDFLAGS`.
 - **Header order:** kit headers with `-I`; the C library's with `-idirafter`, in the order
   **bsd, gnu, posix**. `posix/features.h` is an empty stand-in, and `bsd/features.h` must win to
   define `_DEFAULT_SOURCE`, or `NI_MAXHOST`, `h_errno` and friends are missing. They go after
   the compiler's C++ headers, or libstdc++'s `#include_next <stdlib.h>` fails.
 - configure insists on an ELF-capable `nasm` even for arm64; the script uses a stub.
+- **flex 2.6.10 (CachyOS, Nov 2026) breaks the cross gcc**: gcc 13's generated `gengtype-lex.cc`
+  fails with "variable or field 'yy_start' declared void". The compiler doesn't depend on which
+  system's packages the sysroot comes from, so copy a `generated/cross-tools-arm64` built
+  earlier into the work folder (the script then configures the tree around it), or build with
+  flex 2.6.4.
 - **`build-deps.sh`** cross-builds zlib and OpenSSL 3.5.9 (HaikuPorts' version and patchset)
   into `$HAIKU_ARM64/deps`, with `cmake_lib` / `autotools_lib` helpers and a CMake toolchain
   file for the app's own libraries. Use HaikuPorts' versions, checksums and patchsets (fetched
@@ -76,19 +81,33 @@ arm64 image (renku.md § arm64).
 
 ## Test (QEMU; VirtualBox can't run arm64 guests on x86)
 
-Install onto a properly sized disk first, as for every test VM:
+Test on Renku's arm64 image (renku.md § arm64), not a Haiku nightly. Download it next to its
+`.sha256`, check it, `zstd -d` it, then install it onto a properly sized disk, as for every test
+VM:
 
-    DIR=~/VMs/<app>-arm64 sh scripts/haiku-arm64-vm.sh create haiku-master-hrevNNNNN-arm64-mmc.image
+    DIR=~/VMs/<app>-arm64 sh scripts/haiku-arm64-vm.sh create RenkuOS-arm64-<date>-build<NNN>.img
     DIR=… sh scripts/haiku-arm64-vm.sh start install
 
-`create` makes a 20 GB `disk.img` with the nightly's EFI partition copied over and an empty BFS
-partition. Use the nightly matching the sysroot; `make-sysroot.sh` leaves it in `packages/`. In
-the booted nightly:
+Keep `DIR` short: QEMU's monitor and QMP sockets live there, and a Unix socket path over 108
+characters is cut off, so `start` never sees the VM come up and `shot` fails.
+
+`create` makes a 20 GB `disk.img` with the image's EFI partition copied over and an empty BFS
+partition (Renku's arm64 image has the same layout as Haiku's: EFI at sector 8192, BFS after it).
+In the booted image:
 
 1. DriveSetup: `virtio_block/0/1` (the 20 GB disk's "Unknown (Be File System)"), Partition >
-   Format > Be File System, named e.g. "Test" (not "Haiku", which is the nightly's name).
-2. Installer: from Haiku onto Test, Begin. It takes seconds, then "Boot sector has been written".
+   Format > Be File System, named e.g. "Test" (not the image's own volume name).
+2. Installer: from the image's volume onto Test, Begin. Then "Boot sector has been written".
 3. `shutdown`, then `start` (without `install`) boots the installed disk on its own.
+
+**Open issue (build00090, 16 Nov 2026): only the first boot of a fresh image works.** Every
+later boot of the same image, after QEMU was stopped, hangs on the RENKUOS splash (5 of 5; the
+serial log ends at `register_domain(4, link)`, and `usb_hid` never loads, so Alt+SysRq+D can't
+reach KDL). Reported as RenkuOS/Source#480; the same pattern as build00064 on x86_64 (renku.md
+§ When it hangs). Until it's fixed, decompress a fresh copy for every boot: install the app's
+package in that first boot (`put` can't help, since it needs a clean shutdown first), and expect
+the Installer step above to fail, since the installed disk's first boot is the image's second.
+Renku arm64 ignores QEMU's ACPI power-off, so shut down from the Deskbar.
 
 Then for each package:
 
@@ -106,10 +125,10 @@ Then for each package:
   screens with `ocr-find.sh`. Start the app from Terminal (Deskbar > Applications > Terminal,
   type the command name), so its output stays on screen. `type` handles letters, digits, space
   and `. / - _`; for others use `key`, e.g. `key shift-equal` for `+`.
-- It's emulated (TCG): booting takes about a minute (`start` waits for the input_server's
-  screen_saver line), and each action takes a few seconds.
+- It's emulated (TCG): Haiku's nightly booted in about a minute (`start` waits for the
+  input_server's screen_saver line), and each action takes a few seconds.
 - Copy logs out with `bfs_shell` after `shutdown` (partition 2 starts at sector 73728).
 
 Run the same feature checks as on x86_64, or say why one can't run (e.g. no browser). Write
-`dist/V/evidence/haiku-arm64.txt`. The release notes say it ran on a nightly in QEMU, not on
-R1/beta6 or hardware, and list what arm64 lacks (no Media Kit or translators).
+`dist/V/evidence/haiku-arm64.txt`. The release notes say it ran on Renku's arm64 image in QEMU,
+not on hardware, and list what arm64 lacks there (§ What arm64 lacks).

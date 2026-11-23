@@ -66,6 +66,15 @@ rm -rf "$APPDIR"
 mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/lib" "$APPDIR/usr/share/cosmoe" \
 	"$APPDIR/usr/share/fonts/noto" "$APPDIR/etc/fonts" "$DOC"
 install -m 0755 "$APP_NAME" "$APPDIR/usr/bin/$APP_NAME"
+# Files the app runs or reads besides itself (haiku-app.env APPIMAGE_EXTRA_FILES,
+# "source:dest" pairs, dest relative to the AppDir, e.g. a helper tool and its
+# library in usr/lib/<app>). One whose source wasn't built on this architecture
+# is left out, with a note.
+for pair in ${APPIMAGE_EXTRA_FILES:-}; do
+	src=${pair%%:*}; dst=${pair#*:}
+	if [ -e "$src" ]; then install -D -m 0755 "$src" "$APPDIR/$dst"
+	else echo "build-appimage: $src not built here; $dst left out"; fi
+done
 # Only what this app uses: the Cosmoe libraries the binary links (libtracker,
 # libbnetapi, libopengl...), the image translators haiku-app.env names
 # (APPIMAGE_TRANSLATORS; unset = all of them), and the catalogs of exactly those

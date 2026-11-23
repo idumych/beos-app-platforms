@@ -116,7 +116,7 @@ make COSMOE_ROOT=<stage>/usr && LD_LIBRARY_PATH=<stage>/usr/lib ./App
 3. **Reset RUNPATHs before linuxdeploy:** `$ORIGIN` for `usr/lib/*.so`, `$ORIGIN/../..` for add-ons. Cosmoe v0.9.0 bakes in `/usr/lib` (newer Cosmoe and Hokku set no RUNPATH on Linux) and linuxdeploy only *appends*, so otherwise the host's ICU, pango and cairo win. linuxdeploy contains a `patchelf`: extract it with `--appimage-extract`.
 4. **Run linuxdeploy** with `--executable`, `--deploy-deps-only=` for every add-on and backend, `--desktop-file`, `--icon-file` and `--custom-apprun`. Set `NO_STRIP=1`: its bundled `strip` can't read `.relr.dyn` sections from newer distros.
 5. **AppRun:** set `FONTCONFIG_FILE` (a conf that `<include>`s `/etc/fonts/fonts.conf` and adds `<dir prefix="relative">../../usr/share/fonts</dir>`) and `TRANSLATORS`, then `exec` the binary.
-6. **Pack:** `appimagetool --no-appstream`. Pin both tools' release tags (e.g. linuxdeploy `1-alpha-20251107-1`, appimagetool `1.9.1`). Set `APPIMAGE_EXTRACT_AND_RUN=1` in CI, which has no FUSE.
+6. **Pack:** `appimagetool --no-appstream`. Pin both tools' release tags (e.g. linuxdeploy `1-alpha-20251107-1`, appimagetool `1.9.1`). Set `APPIMAGE_EXTRACT_AND_RUN=1` for the build tools (linuxdeploy, appimagetool) in CI. **Test the app mounted, as users run it:** the smoke tests run it mounted when `/dev/fuse` and `fusermount3` are there (the workflow installs `fuse3`), extracted otherwise, and say which in `run-mode.txt`. Titan's first AppImage passed extracted and crashed mounted for every user: its app folder lookup (`BRoster::GetRunningAppInfo(team)`) came back empty in the read-only mount; `be_app->GetAppInfo()` works.
 
 **Check the output:**
 
