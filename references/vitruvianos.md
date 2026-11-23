@@ -20,7 +20,50 @@ Resources: `rc` → `xres -o <bin>` → `resattr -O -o <bin>`. V\OS keeps the ap
 - **`rc` appends `.rsrc` to an output name that lacks it.** `rc x.rdef -o "$(mktemp)"` writes `/tmp/tmp.XXXX.rsrc`, so `xres`/`resattr` then read the empty mktemp file, apply nothing, and still exit 0. Use `mktemp --suffix=.rsrc`. A pile of `/tmp/tmp.*.rsrc` files is the giveaway.
 - `xres`/`resattr` on a binary that's **currently running** also fail without an error. Quit the app before re-running a postinst by hand.
 
-## Package a .deb
+## About window: V\OS's own BAboutWindow
+
+Use V\OS's `BAboutWindow` for About on V\OS, not a `BAlert` (the user's choice; PowerPaint
+0.1.0 does it). It shows the app icon, name, the version from the app's resources, copyright
+lines and a description, as Haiku's apps do. `libbe.so` exports the class, but V\OS keeps
+its header in `headers/private/interface`, and the link-time SDK (`make-sdk.sh`) leaves
+`headers/private` out, so `#include <AboutWindow.h>` fails in CI.
+
+- Copy `templates/vos/AboutWindow.h` (V\OS's own header, MIT, Haiku, Inc.) into the app,
+  e.g. `src/vos/AboutWindow.h`, and set `VOS_INCLUDES := src/vos` in the Makefile. The
+  template's V\OS branches add it and define `APP_VOS`; Haiku and Cosmoe never see it.
+  Only the class layout matters (vtable, 20 reserved slots, `_reserved[20]`): it's the
+  0.6.2 header, the same in 0.6.3. Re-copy it from V\OS's source if a release changes it.
+- In the app, behind the define:
+
+      #ifdef APP_VOS
+      #include <AboutWindow.h>
+      #endif
+      …
+      void App::AboutRequested()
+      {
+      #ifdef APP_VOS
+          BAboutWindow* about = new BAboutWindow(B_TRANSLATE_SYSTEM_NAME("MyApp"), kAppSig);
+          about->AddDescription(B_TRANSLATE("One sentence on what it does."));
+          const char* extra[] = { "2026 the MyApp contributors", NULL };
+          about->AddCopyright(2022, "Original Author", extra);
+          about->AddExtraInfo(B_TRANSLATE("Distributed under the terms of the MIT License."));
+          about->Show();
+      #else
+          … the alert, or Haiku's BAboutWindow (renku.md § Header differences)
+      #endif
+      }
+
+- The menu item must reach `be_app` (`item->SetTarget(be_app)` or
+  `be_app->PostMessage(B_ABOUT_REQUESTED)`), or About does nothing (Test checklist below).
+- Test it on V\OS: the window must show the version (`0.1.0`), which an alert never does;
+  OCR the screenshot for it.
+- Seen with it: `B_TRANSLATE` links `BLocaleRoster::GetCatalog()` from `liblocalestub.a`, which
+  older SDKs didn't ship (`make-sdk.sh` now builds and copies it; deb.yml's cache key hashes
+  `tools/vos-sdk/*`, so the SDK rebuilds). On a host with Hokku installed, `-llocalestub`
+  silently finds `/usr/lib/liblocalestub.a` instead and the link fails or links the wrong
+  one: check with `-Wl,--trace`. And `RecentItems.h` (`BRecentFilesList`, in libtracker)
+  lives in `os/be_apps/Tracker`, which the template's V\OS branches now search.
+
 
 `templates/packaging/build-deb.sh` and `postinst.in` do this. What they rely on:
 

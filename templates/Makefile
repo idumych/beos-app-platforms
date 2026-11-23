@@ -34,6 +34,10 @@ APP_LIBS :=
 # Files the .rdef imports (icons, PNG resources), so changing one rebuilds
 RSRC_DEPS :=
 
+# Header dirs for V\OS builds only, e.g. src/vos with a copy of V\OS's private
+# AboutWindow.h (references/vitruvianos.md § About window). V\OS builds define APP_VOS.
+VOS_INCLUDES :=
+
 override CXXFLAGS += $(addprefix -I,$(INCLUDES))
 
 ifneq ($(HAIKU_CROSS),)
@@ -54,7 +58,9 @@ else
   ifeq ($(shell pkg-config --exists vos 2>/dev/null && echo yes),yes)
     # VitruvianOS with vos-dev (pkg-config), or a link-time SDK's env.sh
     PLATFORM    := VitruvianOS
-    override CXXFLAGS += $(shell pkg-config --cflags vos) -fPIC
+    override CXXFLAGS += $(shell pkg-config --cflags vos) -fPIC -DAPP_VOS \
+                   -I$(shell pkg-config --variable=includedir vos)/os/be_apps/Tracker \
+                   $(addprefix -I,$(VOS_INCLUDES))
     LIBS        := $(shell pkg-config --libs vos) -ltracker -ltranslation $(APP_LIBS)
   else ifneq ($(wildcard $(VOS_HEADERS)/os/BeBuild.h),)
     # VitruvianOS 0.6.x: headers in the system package, no pkg-config
@@ -66,9 +72,11 @@ else
                    os/drivers/bus os/game os/interface os/locale \
                    os/locale/tools os/mail os/net os/posix/compat/sys \
                    os/add-ons/input_server os/add-ons/tracker os/opengl \
-                   os/media2 posix build build/config_headers config
+                   os/media2 posix build build/config_headers config \
+                   os/be_apps/Tracker
     override CXXFLAGS += $(addprefix -I$(VOS_HEADERS)/,$(VOS_DIRS)) \
-                   -include LinuxBuildCompatibility.h -fPIC
+                   -include LinuxBuildCompatibility.h -fPIC -DAPP_VOS \
+                   $(addprefix -I,$(VOS_INCLUDES))
     LIBS        := -lbe -lroot -ltracker -ltranslation $(APP_LIBS)
   else ifneq ($(wildcard $(COSMOE_ROOT)/include/os/app/Application.h),)
     # Plain Linux with Cosmoe (the Haiku API as a library on X11/Wayland)
