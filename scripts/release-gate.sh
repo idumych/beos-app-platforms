@@ -14,17 +14,19 @@ set -u
 V=$VERSION
 D=dist/$V
 E=$D/evidence
+DEB=${APP_CMD}_${V}-${REVISION}_amd64.deb          # VitruvianOS amd64, tested in QEMU/KVM
+DEB_ARM64=${APP_CMD}_${V}-${REVISION}_arm64.deb    # VitruvianOS arm64, tested in QEMU (emulated)
 HPKG=${APP_CMD}-${V}-${REVISION}-x86_64.hpkg
 APPIMG=${APP_NAME}-${V}-x86_64.AppImage
 APPIMG_ARM64=${APP_NAME}-${V}-aarch64.AppImage  # started in CI on arm64 hardware (X11 + Wayland)
-PLATFORMS=${PLATFORMS:-haiku linux}   # haiku-app.env: "linux" or "haiku" for a one-platform app
+PLATFORMS=${PLATFORMS:-haiku linux vos}   # haiku-app.env: drop a platform only for an app that can't run there
 has() { case " $PLATFORMS " in *" $1 "*) return 0 ;; esac; return 1; }
 REQUIRED="install attrs launch $FEATURE_CHECKS log-clean quit"
 pass=0 fail=0
 ok()  { echo "PASS $1"; pass=$((pass + 1)); }
 bad() { echo "FAIL $1: $2"; fail=$((fail + 1)); }
 field() { sed -n "s/^$2: *//p" "$1" 2>/dev/null | head -1; }
-art() { case $1 in haiku) echo $HPKG ;; linux) echo $APPIMG ;; esac; }
+art() { case $1 in haiku) echo $HPKG ;; vos) echo $DEB ;; linux) echo $APPIMG ;; esac; }
 
 HEAD=$(git rev-parse HEAD)
 # In a fork with an "upstream" remote, gh picks the upstream repo by default
@@ -32,14 +34,17 @@ HEAD=$(git rev-parse HEAD)
 GHR=${GITHUB_REPO:+-R $GITHUB_REPO}
 echo "platforms checked: $PLATFORMS"
 for p in $PLATFORMS; do
-	case $p in haiku|linux) ;; *) bad platforms "unknown platform '$p' in PLATFORMS (haiku, linux)" ;; esac
+	case $p in haiku|linux|vos) ;; *) bad platforms "unknown platform '$p' in PLATFORMS (haiku, linux, vos)" ;; esac
 done
-has haiku || has linux || bad platforms "PLATFORMS names no platform"
+has haiku || has linux || has vos || bad platforms "PLATFORMS names no platform"
 if git diff --quiet HEAD -- 2>/dev/null; then ok tree-clean; else bad tree-clean "tracked files changed since HEAD; commit, push and rebuild"; fi
 if git branch -r --contains "$HEAD" 2>/dev/null | grep -q origin/; then ok head-pushed; else bad head-pushed "HEAD $HEAD is not on origin"; fi
 if git check-ignore -q "$D/x" 2>/dev/null; then ok dist-ignored; else bad dist-ignored "dist/ is not in .gitignore"; fi
 
 # version everywhere it lives
+if has vos; then
+	if head -1 packaging/debian/changelog 2>/dev/null | grep -q "($V-$REVISION)"; then ok "version changelog"; else bad "version changelog" "top entry is not $V-$REVISION"; fi
+fi
 MA=$(echo "$V" | cut -d. -f1) MI=$(echo "$V" | cut -d. -f2) MN=$(echo "$V" | cut -d. -f3)
 MN=${MN:-0}    # a two-part version such as 0.4 has minor 0 in the .rdef
 if tr -d ' \t\n' < "$RDEF" | grep -q "major=$MA,middle=$MI,minor=$MN,"; then ok "version rdef"; else bad "version rdef" "$RDEF app_version is not $V"; fi
@@ -124,30 +129,58 @@ else
 fi
 fi	# has linux
 
-# the arm64 .hpkg (optional; haiku-arm64.md): built for Renku OS arm64, tested on Renku's arm64
-# image in QEMU
+# An arm64 package (the Renku .hpkg, the V\OS .deb), tested in QEMU's emulated virt machine:
+# install, launch and quit must pass; a feature check that can't run there may be
+# "CHECK <name> N/A <why>" (say why: haiku-arm64.md, vitruvianos.md).
+arm64_checks() {	# NAME EVIDENCE-FILE
+	for c in install launch quit; do
+		grep -qE "^CHECK $c PASS" "$2" 2>/dev/null && ok "$1 $c" || bad "$1 $c" "no 'CHECK $c PASS' line in $2"
+	done
+	for c in $FEATURE_CHECKS; do
+		if grep -qE "^CHECK $c PASS" "$2" 2>/dev/null; then ok "$1 $c"
+		elif grep -qE "^CHECK $c N/A .{10,}" "$2" 2>/dev/null; then
+			ok "$1 $c N/A: $(grep -m1 -E "^CHECK $c N/A" "$2" | cut -d' ' -f4- | cut -c1-60)"
+		else bad "$1 $c" "no 'CHECK $c PASS' (or 'N/A <why>') line in $2"; fi
+	done
+	grep -qE "^CHECK [^ ]+ FAIL" "$2" 2>/dev/null && bad "$1 fail" "$(grep -m1 -E '^CHECK [^ ]+ FAIL' "$2")"
+	grep -qx 'RESULT: PASS' "$2" 2>/dev/null && ok "$1 result" || bad "$1 result" "no 'RESULT: PASS' line"
+}
+
+# the arm64 .hpkg (haiku-arm64.md): built for Renku OS arm64, tested on Renku's arm64 nightly
+# in QEMU
 HPKG_ARM64=${APP_CMD}-${V}-${REVISION}-arm64.hpkg
 N=0; WHAT=""
-has haiku && { N=$((N + 1)); WHAT="hpkg"; }
-has linux && { N=$((N + 2)); WHAT="${WHAT:+$WHAT, }2 AppImages"; }
-if has haiku && [ -s "$D/$HPKG_ARM64" ]; then
-	N=$((N + 1)); WHAT="$WHAT, arm64 hpkg"; f=$E/haiku-arm64.txt
+has linux && { N=$((N + 2)); WHAT="2 AppImages"; }
+if has haiku; then
+	N=$((N + 2)); WHAT="${WHAT:+$WHAT, }2 hpkgs"; f=$E/haiku-arm64.txt
+	if [ ! -s "$D/$HPKG_ARM64" ]; then bad "haiku-arm64 artifact" "$D/$HPKG_ARM64 missing (every release ships the Renku arm64 .hpkg)"; fi
 	[ "$(field "$f" sha256)" = "$(sha256sum "$D/$HPKG_ARM64" | cut -d' ' -f1)" ] && ok "haiku-arm64 sha256" \
 		|| bad "haiku-arm64 sha256" "$f missing or for a different file than $D/$HPKG_ARM64"
 	[ "$(field "$f" commit)" = "$HEAD" ] && ok "haiku-arm64 commit" || bad "haiku-arm64 commit" "tested build is from '$(field "$f" commit)', HEAD is $HEAD"
-	for c in install launch quit; do
-		grep -qE "^CHECK $c PASS" "$f" 2>/dev/null && ok "haiku-arm64 $c" || bad "haiku-arm64 $c" "no 'CHECK $c PASS' line in $f"
+	arm64_checks haiku-arm64 "$f"
+fi
+
+if has vos; then
+	field "$E/vos.txt" os | grep -qE 'VitruvianOS 0\.[6-9]' && ok "vos os" || bad "vos os" "os: line does not show VitruvianOS 0.6+"
+	# both .debs must come from a CI run of HEAD (deb.yml: native amd64 and arm64 jobs)
+	for pf in vos:vos.txt vos-arm64:vos-arm64.txt; do
+		p=${pf%%:*} f=$E/${pf#*:}
+		RUN=$(field "$f" ci-run)
+		got=$(gh run view $GHR "$RUN" --json headSha,conclusion,workflowName -q '.headSha+" "+.conclusion+" "+.workflowName' 2>/dev/null)
+		if [ -n "$RUN" ] && echo "$got" | grep -qx "$HEAD success deb"; then ok "$p from CI run $RUN (deb)"
+		else bad "$p ci" "ci-run '$RUN' is not a successful deb run of HEAD (got: $got)"; fi
 	done
-	# A feature check Renku arm64 can't run (e.g. no browser)
-	# may be "CHECK <name> N/A <why>" (haiku-arm64.md: say why one can't run).
-	for c in $FEATURE_CHECKS; do
-		if grep -qE "^CHECK $c PASS" "$f" 2>/dev/null; then ok "haiku-arm64 $c"
-		elif grep -qE "^CHECK $c N/A .{10,}" "$f" 2>/dev/null; then
-			ok "haiku-arm64 $c N/A: $(grep -m1 -E "^CHECK $c N/A" "$f" | cut -d' ' -f4- | cut -c1-60)"
-		else bad "haiku-arm64 $c" "no 'CHECK $c PASS' (or 'N/A <why>') line in $f"; fi
-	done
-	grep -qE "^CHECK [^ ]+ FAIL" "$f" 2>/dev/null && bad "haiku-arm64 fail" "$(grep -m1 -E '^CHECK [^ ]+ FAIL' "$f")"
-	grep -qx 'RESULT: PASS' "$f" 2>/dev/null && ok "haiku-arm64 result" || bad "haiku-arm64 result" "no 'RESULT: PASS' line"
+	N=$((N + 2)); WHAT="${WHAT:+$WHAT, }2 debs"; f=$E/vos-arm64.txt
+	if [ ! -s "$D/$DEB_ARM64" ]; then bad "vos-arm64 artifact" "$D/$DEB_ARM64 missing (deb.yml builds amd64 and arm64)"
+	else
+		ok "vos-arm64 artifact"
+		[ "$(dpkg-deb -f "$D/$DEB_ARM64" Architecture 2>/dev/null)" = arm64 ] && ok "vos-arm64 architecture" \
+			|| bad "vos-arm64 architecture" "control file does not say arm64"
+		[ "$(field "$f" sha256)" = "$(sha256sum "$D/$DEB_ARM64" | cut -d' ' -f1)" ] && ok "vos-arm64 sha256" \
+			|| bad "vos-arm64 sha256" "$f missing or for a different file than $D/$DEB_ARM64"
+		[ "$(field "$f" commit)" = "$HEAD" ] && ok "vos-arm64 commit" || bad "vos-arm64 commit" "tested build is from '$(field "$f" commit)', HEAD is $HEAD"
+		arm64_checks vos-arm64 "$f"
+	fi
 fi
 
 if [ -s "$D/SHA256SUMS" ] && (cd "$D" && sha256sum -c --quiet SHA256SUMS) >/dev/null 2>&1 \

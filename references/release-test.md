@@ -23,16 +23,16 @@ Every platform gets the same standard checks, plus the app's own feature checks 
 
 Start the fixtures from the test plan. VMs reach them at `$HOSTIP` (127.0.0.1 and 10.0.2.2
 don't work from VirtualBox NAT); Linux under Xvfb at 127.0.0.1. Fixture logs go to
-`$E/<p>-<name>.log`, where `<p>` is `haiku` or `linux`.
+`$E/<p>-<name>.log`, where `<p>` is `haiku`, `vos` or `linux`.
 
 ## Evidence file: `dist/V/evidence/<p>.txt`
 
-    platform: haiku | linux
+    platform: haiku | vos | linux
     artifact: <file name>
     sha256: <sha256sum of the file in dist/V that you installed>
     commit: <git rev-parse HEAD the artifact was built from>
-    os: <`uname -a` on Haiku; host distro + "X11 Xvfb/Openbox" on Linux>
-    ci-run: <run id>                 (linux: the appimage.yml run)
+    os: <`uname -a` on Haiku; "VitruvianOS <vos package version> on <PRETTY_NAME> <uname -r>"; host distro + "X11 Xvfb/Openbox" on Linux>
+    ci-run: <run id>                 (linux: appimage.yml run; vos: deb.yml run)
     CHECK install PASS <command> -> <the line that proves it>
     CHECK <name> PASS|FAIL <evidence file or command>: "<matching line>"
     RESULT: PASS            (only if every CHECK is PASS; otherwise RESULT: FAIL)
@@ -73,7 +73,7 @@ and note the result in the evidence file.
 2. Click: `m:click,X,Y` in a VM, `c:X,Y` under Xvfb. Menu items: hover first (virtualbox.md).
    A VM with a PS/2 pointer takes no absolute clicks: drive the app with `hey`
    (porting.md § 6, `hey-ui.sh`) and say so in the release notes' "Tested" section.
-3. Type: click into the field, select all, then `t:<text>`. Select all is Haiku `k:38,1e,9e,b8`
+3. Type: click into the field, select all, then `t:<text>`. Select all is Haiku `k:38,1e,9e,b8`, V\OS `k:1d,1e,9e,9d`
    and Xvfb `k:ctrl+a`, but only if the app has no Select all menu item of its own: Ctrl/Alt+A
    then selects the whole document (EasyPaint), and the digits are appended to the field.
    Clear such a field with `k:End` and `k:BackSpace` instead.
@@ -94,43 +94,40 @@ and note the result in the evidence file.
    text in OCR *and* a red pixel on the rectangle's edge (PIL `getpixel`; sample a few pixels
    around the expected line, which may be one off).
 
-## Test VM
+## Test VMs
 
-One shared VM serves every app: install, test, remove. Keep this machine's details (SSH key,
-which known-good VMs exist to clone from) in your local notes or memory, not in this skill.
+Every release is tested on five artifacts, four of them in VMs, all in QEMU (no VirtualBox). The
+VMs are shared by every app: install, test, remove. Each runs an OS installed onto its own
+20 GB+ disk image, never a small copy of the install image. Keep this machine's details (SSH
+key, ports, which VMs exist) in your local notes or memory, not in this skill.
 
-| VM | SSH alias | Host port | Firmware, screen | Guest user | Command key |
+| Artifact | VM | How it runs | Firmware, screen | Command key | Reference |
 |---|---|---|---|---|---|
-| `haiku-b6-test` | `haiku-b6-test` | 127.0.0.1:2224 | BIOS, 1024×768 | `user` (uid 0) | **Alt** |
+| `.hpkg` x86_64 | `haiku-b6-test`: Haiku R1/beta6 | `qemu-vm.sh` (KVM), SSH | BIOS, 1024×768 | **Alt** | below |
+| `.hpkg` arm64 | Renku OS arm64 nightly | `haiku-arm64-vm.sh` (emulated), desktop only | UEFI, 1024×768 | **Alt** | haiku-arm64.md § Test |
+| `.deb` amd64 | `vos-test`: VitruvianOS | QEMU/KVM + OVMF, SSH | UEFI, 1280×800 | **Ctrl** | vitruvianos.md § Test VMs |
+| `.deb` arm64 | `vos-arm64`: VitruvianOS | QEMU virt (emulated) + edk2 | UEFI | **Ctrl** | vitruvianos.md § Test VMs |
+| AppImage x86_64 / aarch64 | none: Xvfb here; CI on arm64 | | | **Ctrl** | below |
 
-**No `haiku-b6-test` on this machine?** Ask before using any other Haiku VM, even for one
-release (EasyPaint 0.2.0 was tested on the user's own R1/beta6 VM with their permission).
-Don't change its settings: if it boots a live ISO first, use the F12 boot menu
-(virtualbox.md), and shut it down from inside when done. Note it as a `DECISION`.
+**Create a Haiku VM:** boot the official anyboot image as installer media with an empty raw
+disk beside it, install onto that disk with Installer, write the image's MBR boot code to it,
+then set up SSH (renku.md § SSH) and `pkgman install -y gcc make haiku_devel`. SSH aliases in
+`~/.ssh/config`: `HostName 127.0.0.1`, the port, the user, `IdentityFile <key>`,
+`IdentitiesOnly yes`, `StrictHostKeyChecking accept-new`,
+`UserKnownHostsFile ~/.ssh/known_hosts_testvms`.
 
-**Only drive this one.** Never start, stop, modify or delete any other VM; the one thing you
-may do with another VM is clone *from* it while it's powered off.
+**No test VM for a platform on this machine?** Ask before using any other VM, even for one
+release, and note it as a `DECISION`. **Only drive the test VMs.** Never start, stop, modify or
+delete any other VM; the one thing you may do with another is copy *from* its disk while it's
+off.
 
-**Create (once per machine):** `VBoxManage list vms`. Fastest is cloning a known-good VM that
-already has the toolchain and SSH (must be `poweroff`), then changing its port **before the
-first boot**, since source VMs usually forward 2222:
+**Start them detached** (`setsid nohup … &`): a QEMU started from a background task dies when
+that task is stopped, leaving the disk dirty. Judge a boot by screenshots (OCR for "Tracker" or
+"Deskbar"), not by a line in the serial log, and watch long waits with a monitor that reports
+stalls. A black screenshot is usually the screen blanker: move the pointer first.
 
-    VBoxManage clonevm <source> --name haiku-b6-test --register --mode machine
-    VBoxManage modifyvm haiku-b6-test --natpf1 delete ssh
-    VBoxManage modifyvm haiku-b6-test --natpf1 "ssh,tcp,127.0.0.1,2224,,22"
-
-Without one: `sh $P/make-vm.sh haiku-b6-test ~/Downloads/haiku-r1beta6-x86_64-anyboot.iso`, add
-the port forward (powered off), set up SSH (renku.md § SSH), and
-`ssh haiku-b6-test pkgman install -y gcc make haiku_devel`. SSH aliases in `~/.ssh/config`:
-`HostName 127.0.0.1`, the port, the user, `IdentityFile <key>`, `IdentitiesOnly yes`,
-`StrictHostKeyChecking accept-new`, `UserKnownHostsFile ~/.ssh/known_hosts_testvms`.
-
-**Boot:** `VBoxManage startvm <vm> --type headless`, then
-`for i in $(seq 60); do ssh -o ConnectTimeout=5 -o BatchMode=yes <vm> true && break; sleep 5; done`.
-Haiku starts sshd by itself (`uname -a` shows `hrev59866`).
-
-**Shut down** (installed packages are kept): `ssh haiku-b6-test 'sync; shutdown'`; only after
-2 minutes, `VBoxManage controlvm <vm> poweroff`.
+**Shut down** from inside (installed packages are kept): `ssh haiku-b6-test 'sync; shutdown'`,
+`ssh vos-test 'sudo poweroff'`, `haiku-arm64-vm.sh shutdown`; pull the plug only after 2 minutes.
 
 ## Haiku R1/beta6 (`haiku-b6-test`)
 
@@ -147,18 +144,45 @@ Haiku starts sshd by itself (`uname -a` shows `hrev59866`).
     ssh haiku-b6-test "catattr BEOS:APP_SIG /boot/system/$APP_PATH"   # attrs
     # fresh state: delete what the test plan names
     ssh haiku-b6-test "(/boot/system/$APP_PATH > /tmp/app.log 2>&1 &)"; sleep 5
-    VM=haiku-b6-test SCRATCH=$S sh $P/vm.sh shot:haiku-launch
+    DIR=~/VMs/haiku-b6-test sh $P/qemu-vm.sh shot $S/haiku-launch
     … feature steps …
-    VM=haiku-b6-test sh $P/vm.sh k:38,10,90,b8                        # Alt+Q (click the window first)
+    DIR=~/VMs/haiku-b6-test sh $P/qemu-vm.sh key alt-q                 # click the window first
     ssh haiku-b6-test "ps | grep -v grep | grep -c '/$APP_PATH'"    # quit: 0 (count your own grep out)
     scp haiku-b6-test:/tmp/app.log $E/haiku-app.log
 
 A GUI app started over SSH appears on the Haiku desktop. **Wake the screen first:** after a
 few idle minutes Haiku's screen blanker turns the screen black, and the first key or click
-only wakes it (screenshots come out black, the first typed letter is lost). Send a relative
-mouse move through `vboxapi` (`session.console.mouse.putMouseEvent(30, 0, 0, 0, 0)`, then
-back) before launching, and again before typing after any long step. If `pkgman` asks for confirmation
-even with `-y`, a dependency is missing: add it to `HPKG_REQUIRES_EXTRA` and the test plan.
+only wakes it (screenshots come out black, the first typed letter is lost). Move the pointer
+(`qemu-vm.sh move`) before launching, and again before typing after any long step. If `pkgman`
+asks for confirmation even with `-y`, a dependency is missing: add it to `HPKG_REQUIRES_EXTRA`
+and the test plan.
+
+## Renku OS arm64
+
+Run the same plan on the Renku arm64 nightly (haiku-arm64.md § Test): install, attrs, launch,
+the feature checks (or `CHECK <name> N/A <why>` for one that can't run there), quit, the app's
+log. Evidence: `$E/haiku-arm64.txt`.
+
+## VitruvianOS (`vos-test`, amd64)
+
+    F=${APP_CMD}_${V}-${REVISION}_amd64.deb
+    echo "VitruvianOS $(ssh vos-test "dpkg-query -W -f '\${Version}' vos") on $(ssh vos-test '. /etc/os-release; echo "$PRETTY_NAME $(uname -r)"')"  # -> os:
+    ssh vos-test "sudo apt-get purge -y $APP_CMD" 2>&1 | tail -1
+    scp $D/$F vos-test:/tmp/ && ssh vos-test "sudo apt-get install -y /tmp/$F" 2>&1 | tail -3
+    ssh vos-test "dpkg-query -W $APP_CMD; test -s /system/apps/$APP_NAME && echo nonempty"   # install
+    ssh vos-test "getfattr -d -m user.beos /system/apps/$APP_NAME" | grep APP_SIG          # attrs
+    ssh vos-test "sha256sum /system/apps/$APP_NAME"; dpkg-deb --fsys-tarfile $D/$F | tar -xO ./system/apps/$APP_NAME | sha256sum   # must match
+
+Launch over SSH (`ssh vos-test "(/system/apps/$APP_NAME > /tmp/app.log 2>&1 &)"`) and take a
+screenshot; if no window appears, start it from the desktop Terminal instead. Quit with Ctrl+Q,
+check `pgrep -x $APP_NAME || echo gone`, copy `/tmp/app.log` to `$E/vos-app.log`.
+
+## VitruvianOS arm64 (`vos-arm64`)
+
+The arm64 `.deb` runs on V\OS's arm64 UEFI image in QEMU's emulated virt machine
+(vitruvianos.md § Test VMs). Run the same plan: install, attrs, launch, the feature checks (or
+`CHECK <name> N/A <why>`), quit, the app's log. `check-artifact.sh deb` checks it statically
+too. Evidence: `$E/vos-arm64.txt`, with the CI run in `ci-run:`.
 
 ## Linux (the CI AppImage, under Xvfb)
 

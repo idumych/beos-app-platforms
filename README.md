@@ -1,6 +1,6 @@
 # beos-app-platforms
 
-A [Claude Code](https://claude.com/claude-code) skill (also usable from opencode) for **BeOS-style apps**: C++ written against the Be/Haiku API (BApplication, BWindow, the storage, interface and media kits). It covers the whole life of such an app: porting it to the native API, building one source tree for several systems, testing every package on the system it's for, and releasing it, with a human sign-off before anything is published.
+A [Claude Code](https://claude.com/claude-code) skill (also usable from opencode) for **BeOS-style apps**: C++ written against the Be/Haiku API (BApplication, BWindow, the storage, interface and media kits). It covers the whole life of such an app: porting it to the native API, building one source tree for Haiku, Renku OS, VitruvianOS and Linux, testing every package on the system it's for, and releasing it, with a human sign-off before anything is published.
 
 It's written as instructions an agent follows, with scripts and templates beside them, so a model (a local one included) can do this work largely unsupervised, and stop where it should.
 
@@ -23,6 +23,9 @@ Claude loads it when a task involves building, porting, packaging, releasing or 
 | [Renku OS](https://github.com/RenkuOS/Source) (a Haiku fork) and [Haiku](https://www.haiku-os.org) R1/beta6, x86_64 | `.hpkg`; one package installs on both (Renku still calls its system package `haiku r1~beta6`) | In a Haiku R1/beta6 VM, on a GitHub runner, or on Renku itself | In a VM: installed, launched, driven, read back from disk |
 | Renku OS arm64 | `.hpkg`; libraries from Renku's arm64 ports repository, or cross-built and linked in statically | Cross-built on Linux against Renku's arm64 packages (Haiku has no R1/beta6 arm64 release) | On Renku's arm64 image in QEMU, installed onto a 20 GB disk |
 | Linux, through [Hokku](https://github.com/idumych/hokku) (a fork of [Cosmoe](https://github.com/haydentech/cosmoe)) | AppImage, x86_64 and aarch64, bundling both the X11 and the Wayland backend | Natively per architecture in GitHub CI, on the oldest supported distro | Full test under Xvfb; started under X11 and headless Wayland on both architectures in CI |
+| [VitruvianOS](https://v-os.dev) (V\OS, a BeOS-like OS based on Linux) | `.deb`, amd64 and arm64 | Natively per architecture in GitHub CI, in `debian:trixie` against a link-time V\OS SDK | On V\OS in QEMU, installed onto a 20 GB disk: amd64 under KVM, arm64 emulated |
+
+Every release ships all of them: the Haiku R1/beta6 `.hpkg` (x86_64), the Renku OS nightly `.hpkg` (arm64), the Hokku AppImage (x86_64 and aarch64) and the V\OS `.deb` (amd64 and arm64), each tested where it runs.
 
 ## Ground rules it enforces
 
@@ -94,7 +97,8 @@ Or, to share it with one project's collaborators, put it in that project's `.cla
 | `references/media-kit.md` | Audio apps: a filter node between the mixer and the sound card, its traps, end-to-end audio tests |
 | `references/release.md` | The release procedure: phases, building, release notes, publishing |
 | `references/onboard.md` | Setting an app up for releases: `haiku-app.env`, the Makefile contract, templates, the app's test plan |
-| `references/release-test.md` | Testing each package on its platform and writing the evidence; the shared test VM |
+| `references/release-test.md` | Testing each package on its platform and writing the evidence; the shared test VMs |
+| `references/vitruvianos.md` | VitruvianOS: amd64/arm64 SDK and CI, `.deb` packaging, Deskbar tray items, QEMU test VMs, traps |
 | `references/renku.md` | Renku OS and Haiku guests: Renku's package repositories (Renku only), VMs (VirtualBox or QEMU), the boot hang, SSH, building on Renku, the `.hpkg`, CI builds, arm64, bug reports |
 | `references/haiku-arm64.md` | The Renku OS arm64 `.hpkg`: cross toolchain, sysroot from Renku's packages, static libraries, what arm64 lacks, the QEMU test machine |
 | `references/cosmoe-linux.md` | Hokku/Cosmoe: using and fixing Hokku, porting traps, the AppImage, CI, headless X11 and Wayland tests |
@@ -112,10 +116,10 @@ Or, to share it with one project's collaborators, put it in that project's `.cla
 | `scripts/xtest.sh` | Drive a Cosmoe app under Xvfb, away from your real desktop |
 | `scripts/make-hvif-icon.py` | Encode a vector app icon (HVIF) as an `.rdef` resource, with an SVG preview |
 | `scripts/redactshot.py`, `scripts/ocr-find.sh` | Screenshots with private areas blacked out; a screenshot as text with click positions |
-| `scripts/check-artifact.sh`, `scripts/release-gate.sh` | Static package checks; the final yes/no for a release |
+| `scripts/check-artifact.sh`, `scripts/release-gate.sh` | Static package checks (`.hpkg`, `.deb`, AppImage); the final yes/no for a release |
 | `templates/` | Copied into an app by onboarding: `haiku-app.env`, `Makefile`, `packaging/`, `.github/workflows/`, `tools/` |
 
-**Requirements** for the scripts: VirtualBox 7 with its SDK (`vboxapi`) or QEMU with KVM, plus `socat`; ImageMagick; `xorg-server-xvfb`, `openbox` and `xdotool` for headless Cosmoe tests; `tesseract` for `ocr-find.sh`; Python 3 with PIL and NumPy; `qemu-user` or `squashfs-tools` to unpack an aarch64 AppImage on an x86 host; and `gh` for releases and CI. The Wayland tests and the aarch64 builds run on GitHub's runners, so the host needs none of that.
+**Requirements** for the scripts: VirtualBox 7 with its SDK (`vboxapi`) or QEMU with KVM, plus `socat`; ImageMagick; `xorg-server-xvfb`, `openbox` and `xdotool` for headless Cosmoe tests; `tesseract` for `ocr-find.sh`; `dpkg` for the `.deb` checks; Python 3 with PIL and NumPy; `qemu-user` or `squashfs-tools` to unpack an aarch64 AppImage on an x86 host; and `gh` for releases and CI. The Wayland tests and the aarch64 builds run on GitHub's runners, so the host needs none of that.
 
 The scripts have been used on Arch-based hosts (CachyOS) with VirtualBox 7.2 and QEMU 11.
 
